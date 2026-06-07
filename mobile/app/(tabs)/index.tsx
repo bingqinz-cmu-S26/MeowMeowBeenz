@@ -1,6 +1,8 @@
+import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AccountButton } from '@/components/ui/AccountButton';
+import { AddButton } from '@/components/ui/AddButton';
 import { CatCard } from '@/components/ui/CatCard';
 import { MetricGrid } from '@/components/ui/MetricGrid';
 import { Panel } from '@/components/ui/Panel';
@@ -39,11 +41,16 @@ export default function HomeScreen() {
         </View>
       </Panel>
 
-      <Panel eyebrow="Cat roster" title="Profiles">
+      <Panel
+        eyebrow="Cat roster"
+        title="Profiles"
+        right={<AddButton onPress={() => router.push('/add-cat')} />}>
         <View style={styles.stack}>
-          {cats.map((cat) => (
-            <CatCard key={cat.id} cat={cat} />
-          ))}
+          {cats.length === 0 ? (
+            <Text style={styles.empty}>No cats yet. Tap Add to create one.</Text>
+          ) : (
+            cats.map((cat) => <CatCard key={cat.id} cat={cat} />)
+          )}
         </View>
       </Panel>
     </Screen>
@@ -62,4 +69,5 @@ const styles = StyleSheet.create({
   },
   insightTitle: { color: Theme.text, fontWeight: '700', fontSize: 14 },
   insightBody: { color: Theme.muted, fontSize: 13, lineHeight: 18 },
+  empty: { color: Theme.muted, fontSize: 13 },
 });

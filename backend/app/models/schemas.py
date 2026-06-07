@@ -10,13 +10,20 @@ ActivityFilter = Literal["all", "activity", "eating", "litter", "vocal", "warnin
 
 class CatProfile(BaseModel):
     id: str
+    ownerId: str | None = None
+    ownerUsername: str | None = None
     name: str
     initials: str
     age: str
-    breed: str
-    room: str
-    routine: str
+    birthDate: str
+    device: str | None = None
     accent: str
+
+
+class CreateCatRequest(BaseModel):
+    name: str
+    birth_date: str
+    device: str | None = None
 
 
 class TimelineEvent(BaseModel):

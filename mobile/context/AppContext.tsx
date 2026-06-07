@@ -1,10 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { useAuth } from '@/context/AuthContext';
 import * as api from '@/lib/api';
-import { CAT_PROFILES } from '@/lib/cats';
 import { buildRangeReport } from '@/lib/healthRules';
 import { createSeedEvents } from '@/lib/sampleData';
-import type { ActivityFilter, CatProfile, ChatMessage, HealthReport, ReportRange, TimelineEvent } from '@/types';
+import type { ActivityFilter, CatProfile, ChatMessage, CreateCatInput, HealthReport, ReportRange, TimelineEvent } from '@/types';
 
 type AppContextValue = {
   cats: CatProfile[];
@@ -23,6 +23,7 @@ type AppContextValue = {
   addScenario: (type: string) => Promise<void>;
   analyzeNow: () => Promise<void>;
   sendMessage: (question: string) => Promise<void>;
+  addCat: (input: CreateCatInput) => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -36,7 +37,8 @@ const initialChat: ChatMessage[] = [
 ];
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [cats, setCats] = useState<CatProfile[]>(CAT_PROFILES);
+  const { user } = useAuth();
+  const [cats, setCats] = useState<CatProfile[]>([]);
   const [events, setEvents] = useState<TimelineEvent[]>(createSeedEvents());
   const [reportRange, setReportRange] = useState<ReportRange>('day');
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
@@ -50,13 +52,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     const connected = await api.checkHealth();
     setApiConnected(connected);
+
+    if (!user) {
+      setCats([]);
+      setEvents(createSeedEvents());
+      setLoading(false);
+      return;
+    }
+
     if (connected) {
-      const [nextCats, nextEvents] = await Promise.all([api.fetchCats(), api.fetchEvents()]);
-      setCats(nextCats);
+      try {
+        const nextCats = await api.fetchCats();
+        setCats(nextCats.filter((cat) => !cat.ownerUsername || cat.ownerUsername === user.username));
+      } catch {
+        setCats([]);
+      }
+      const nextEvents = await api.fetchEvents();
       setEvents(nextEvents);
     }
     setLoading(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     refresh();
@@ -93,6 +108,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [events, report],
   );
 
+  const addCat = useCallback(async (input: CreateCatInput) => {
+    const cat = await api.createCat(input);
+    setCats((current) => [...current, cat]);
+  }, []);
+
   const value = useMemo(
     () => ({
       cats,
@@ -111,6 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addScenario,
       analyzeNow,
       sendMessage,
+      addCat,
     }),
     [
       cats,
@@ -127,6 +148,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addScenario,
       analyzeNow,
       sendMessage,
+      addCat,
     ],
   );
 

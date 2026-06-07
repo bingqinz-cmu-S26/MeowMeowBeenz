@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { AppProvider } from '@/context/AppContext';
 import { AuthProvider } from '@/context/AuthContext';
 
 export {
@@ -23,12 +24,15 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="account" options={{ presentation: 'modal' }} />
-      </Stack>
+      <AppProvider>
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="account" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="add-cat" options={{ presentation: 'modal' }} />
+        </Stack>
+      </AppProvider>
     </AuthProvider>
   );
 }

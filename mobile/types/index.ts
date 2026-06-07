@@ -5,13 +5,20 @@ export type ActivityFilter = 'all' | 'activity' | 'eating' | 'litter' | 'vocal' 
 
 export type CatProfile = {
   id: string;
+  ownerId?: string;
+  ownerUsername?: string;
   name: string;
   initials: string;
   age: string;
-  breed: string;
-  room: string;
-  routine: string;
+  birthDate: string;
+  device?: string | null;
   accent: string;
+};
+
+export type CreateCatInput = {
+  name: string;
+  birthDate: string;
+  device?: string;
 };
 
 export type TimelineEvent = {

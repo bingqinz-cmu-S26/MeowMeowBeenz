@@ -1,7 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { AppProvider } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { Theme } from '@/constants/Theme';
 
@@ -81,9 +80,5 @@ export default function TabLayout() {
     return <Redirect href="/(auth)" />;
   }
 
-  return (
-    <AppProvider>
-      <TabsNavigator />
-    </AppProvider>
-  );
+  return <TabsNavigator />;
 }

@@ -1,5 +1,5 @@
 from app.database import get_database
-from app.services.sample_data import CAT_PROFILES, create_seed_events
+from app.services.sample_data import create_seed_events
 
 
 async def ensure_seed_data() -> None:
@@ -9,10 +9,8 @@ async def ensure_seed_data() -> None:
 
     await db.users.create_index("username", unique=True)
     await db.users.create_index("id", unique=True)
-
-    cat_count = await db.cats.count_documents({})
-    if cat_count == 0:
-        await db.cats.insert_many(CAT_PROFILES)
+    await db.cats.create_index("id", unique=True)
+    await db.cats.create_index([("owner_id", 1), ("owner_username", 1), ("created_at", 1)])
 
     event_count = await db.events.count_documents({})
     if event_count == 0:
