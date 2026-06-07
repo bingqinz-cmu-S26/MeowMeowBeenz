@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     mongodb_uri: str = ""
     mongodb_db: str = "meowmeowbeenz"
     port: int = 8000
-    cors_origins: str = "http://localhost:4173,http://localhost:8081,exp://localhost:8081"
+    cors_origins: str = "http://localhost:8081,exp://localhost:8081"
 
     minimax_api_key: str = ""
     minimax_api_url: str = "https://api.minimax.io/v1/chat/completions"

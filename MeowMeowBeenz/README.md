@@ -1,7 +1,9 @@
-# MeowMeowBeenz
+# MeowMeowBeenz iOS
 
-A starter native iOS app built with SwiftUI.
+Native SwiftUI client for the MeowMeowBeenz backend.
 
-## Open
+## Run
 
-Open `MeowMeowBeenz.xcodeproj` in Xcode, select an iPhone simulator, and run the `MeowMeowBeenz` scheme.
+1. Start the API from the repo root: `./run.sh`
+2. Open `MeowMeowBeenz.xcodeproj` in Xcode and run the **MeowMeowBeenz** scheme.
+3. Set the backend URL in **Account** if needed (default: `http://localhost:8000` on simulator; use your Mac's LAN IP on a physical device).
