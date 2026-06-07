@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MeowMeowBeenz — Cat Mood Monitor</title>
+<style>
+  :root{
+    --bg:#0b0d12; --card:#151924; --line:#222838; --muted:#7c8499;
+    --txt:#e8edf6; --accent:#5b8cff; --good:#36d399;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(1100px 560px at 50% -12%,#161b29,#0b0d12);
+    color:var(--txt);font:15px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;
+    height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;overflow:hidden}
+  .app{width:480px;max-width:100%}
+  .head{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+  .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#5b8cff,#9a6bff);
+    display:flex;align-items:center;justify-content:center;font-size:20px}
+  h1{font-size:18px;margin:0;font-weight:650}
+  .sub{color:var(--muted);font-size:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px;margin-bottom:11px}
+  .status{display:flex;align-items:center;gap:9px;font-weight:600;font-size:14px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);transition:.3s}
+  .dot.live{background:var(--good);animation:pulse 1.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(54,211,153,.5)}70%{box-shadow:0 0 0 10px rgba(54,211,153,0)}100%{box-shadow:0 0 0 0 rgba(54,211,153,0)}}
+  .meter{height:40px;margin:12px 0 5px;display:flex;align-items:center;gap:2px}
+  .bar{flex:1;background:#2a3142;border-radius:2px;height:8%}
+  .time{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .steps{list-style:none;margin:0;padding:0}
+  .step{display:flex;gap:11px;padding:7px 0;opacity:.4;transition:.35s}
+  .step.on{opacity:1}
+  .step .ic{width:23px;height:23px;border-radius:50%;border:2px solid var(--line);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:12px;transition:.35s}
+  .step.on .ic{border-color:var(--accent);background:rgba(91,140,255,.15)}
+  .step.done .ic{border-color:var(--good);background:var(--good);color:#06210f}
+  .step .t{font-weight:600;font-size:14px}.step .d{color:var(--muted);font-size:12px}
+  .result{margin-top:2px;opacity:0;max-height:0;overflow:hidden;transition:.5s}
+  .result.show{opacity:1;max-height:340px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .rtop{display:flex;align-items:baseline;gap:12px}
+  .mood{font-size:30px;font-weight:800;text-transform:capitalize;line-height:1}
+  .conf{color:var(--muted);font-size:13px}
+  .row{display:flex;align-items:center;gap:9px;margin:5px 0;font-size:12px}
+  .row .lab{width:74px;color:var(--muted);text-transform:capitalize}
+  .track{flex:1;height:7px;background:#2a3142;border-radius:5px;overflow:hidden;display:block}
+  .fill{display:block;height:7px;width:0;border-radius:5px;background:var(--accent);transition:width .8s}
+  .pct{width:34px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  .foot{display:flex;align-items:center;gap:10px;margin-top:11px}
+  .badge{display:none;align-items:center;gap:6px;background:rgba(54,211,153,.13);
+    color:var(--good);padding:5px 10px;border-radius:20px;font-size:12px;font-weight:600}
+  .pay{flex:1;color:var(--muted);font-size:11px;font-family:ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  button{width:100%;padding:13px;border:0;border-radius:11px;background:var(--accent);color:#fff;
+    font-size:15px;font-weight:650;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="head">
+    <div class="logo">🐾</div>
+    <div><h1>MeowMeowBeenz</h1><div class="sub">Real-time cat mood monitor</div></div>
+  </div>
+
+  <div class="card">
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Idle — press Start</span></div>
+    <div class="meter" id="meter"></div>
+    <div class="time"><span>0:00</span><span id="clock">0:00</span><span>0:13</span></div>
+  </div>
+
+  <div class="card">
+    <ul class="steps">
+      <li class="step" id="s1"><div class="ic">1</div><div><div class="t">LiveKit listening</div><div class="d">streaming room audio</div></div></li>
+      <li class="step" id="s2"><div class="ic">2</div><div><div class="t">Meow detected</div><div class="d" id="s2d">voice-activity gate</div></div></li>
+      <li class="step" id="s3"><div class="ic">3</div><div><div class="t">AST + probe classifying</div><div class="d">frozen encoder → 5-class probe</div></div></li>
+      <li class="step" id="s4"><div class="ic">4</div><div><div class="t">Sent to backend</div><div class="d" id="s4d">POST /cat-event</div></div></li>
+    </ul>
+
+    <div class="result" id="result">
+      <div class="rtop"><span class="mood" id="mood">—</span><span class="conf" id="conf"></span></div>
+      <div id="bars" style="margin-top:8px"></div>
+      <div class="foot"><span class="badge" id="badge">✓ Delivered</span><span class="pay" id="payload"></span></div>
+    </div>
+  </div>
+
+  <button id="start">▶ Start monitoring</button>
+</div>
+
+<script>
+const CLASSES = ["content","soliciting","agitated","distress","hunting"];
+const COLOR = {content:"#36d399",soliciting:"#5b8cff",agitated:"#ffb454",distress:"#ff5d6c",hunting:"#9a6bff"};
+const NBARS = 44, THRESH = 0.03;
+const meter = document.getElementById("meter");
+const bars = [], levels = new Array(NBARS).fill(8);
+for(let i=0;i<NBARS;i++){const b=document.createElement("div");b.className="bar";meter.appendChild(b);bars.push(b);}
+const $=id=>document.getElementById(id);
+const fmt=t=>"0:"+String(Math.floor(t)).padStart(2,"0");
+function setStep(id,state){const e=$(id);e.classList.toggle("on",state!=="off");e.classList.toggle("done",state==="done");
+  if(state==="done")e.querySelector(".ic").textContent="✓"; else e.querySelector(".ic").textContent=id[1];}
+
+const ORDER = ["content","agitated","distress"];   // the 3 sounds in the combined clip, in order
+let audio, ctx, analyser, data, raf, eventIdx=0, lastDetect=-99;
+
+$("start").onclick = () => run();
+
+async function run(){
+  $("start").disabled = true; eventIdx = 0; lastDetect = -99; cancelAnimationFrame(raf);
+  $("result").classList.remove("show"); $("badge").style.display="none"; $("payload").textContent="";
+  ["s1","s2","s3","s4"].forEach(s=>setStep(s,"off")); $("s2d").textContent="voice-activity gate";
+
+  audio = new Audio("/assets/combined.wav");
+  ctx = ctx || new (window.AudioContext||window.webkitAudioContext)();
+  await ctx.resume();
+  const src = ctx.createMediaElementSource(audio);
+  analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+  data = new Uint8Array(analyser.fftSize);
+  src.connect(analyser); analyser.connect(ctx.destination);
+
+  $("dot").classList.add("live"); $("statusText").textContent="Listening (LiveKit)…"; setStep("s1","on");
+  audio.play(); loop();
+  audio.onended = ()=>{ $("statusText").textContent="Session complete · "+eventIdx+" events sent ✓"; $("start").disabled=false; };
+}
+
+function loop(){
+  raf = requestAnimationFrame(loop);
+  analyser.getByteTimeDomainData(data);
+  let sum=0; for(let i=0;i<data.length;i++){const v=(data[i]-128)/128; sum+=v*v;}
+  const rms=Math.sqrt(sum/data.length);
+  const t=performance.now()/1000;
+  const idle = 24 + 11*Math.sin(t*5) + 7*Math.sin(t*9+1) + Math.random()*10;
+  const lvl = Math.min(100, Math.max(idle, 12 + rms*460));
+  levels.push(lvl); levels.shift();
+  for(let i=0;i<NBARS;i++){ const h=levels[i];
+    bars[i].style.height=h.toFixed(0)+"%";
+    bars[i].style.background = h>60 ? "#36d399" : "#5b8cff";
+    bars[i].style.opacity = (0.35 + h/130).toFixed(2); }
+  if(audio) $("clock").textContent = fmt(Math.min(13,audio.currentTime));
+  // re-arming gate: detect each of the 3 sound events once (cooldown so one sound = one event)
+  if(rms>THRESH && eventIdx<ORDER.length && (audio.currentTime-lastDetect>2.5)){
+    lastDetect = audio.currentTime;
+    onMeow(audio.currentTime, ORDER[eventIdx], ++eventIdx);
+  }
+}
+
+async function onMeow(t, clip, n){
+  $("statusText").textContent="Meow "+n+" detected — classifying";
+  $("s2d").textContent="event "+n+" @ "+fmt(t);
+  setStep("s1","done"); setStep("s2","done"); setStep("s3","on"); setStep("s4","off"); $("badge").style.display="none";
+
+  const r = await (await fetch("/classify?clip="+clip,{method:"POST"})).json();
+  setStep("s3","done"); setStep("s4","on");
+
+  $("mood").textContent = r.mood; $("mood").style.color = COLOR[r.mood];
+  $("conf").textContent = "event "+n+" · confidence "+Math.round(r.confidence*100)+"%";
+  const bx=$("bars"); bx.innerHTML="";
+  CLASSES.forEach(c=>{
+    const p=Math.round((r.scores[c]||0)*100);
+    bx.insertAdjacentHTML("beforeend",
+      `<div class="row"><span class="lab">${c}</span><span class="track"><span class="fill" style="background:${COLOR[c]}"></span></span><span class="pct">${p}%</span></div>`);
+  });
+  $("result").classList.add("show");
+  requestAnimationFrame(()=>document.querySelectorAll(".fill").forEach((f,i)=>{
+    f.style.width = Math.round((r.scores[CLASSES[i]]||0)*100)+"%";}));
+
+  const payload = {event:"cat_vocalization", mood:r.mood, confidence:r.confidence, ts:new Date().toISOString()};
+  $("payload").textContent = "POST /cat-event · "+JSON.stringify({mood:r.mood,confidence:r.confidence});
+  await fetch("/backend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  setStep("s4","done"); $("badge").style.display="inline-flex";
+}
+</script>
+</body>
+</html>

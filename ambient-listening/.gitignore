@@ -1,0 +1,12 @@
+# Secrets and local environments
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Large/local datasets and archives
+data/
+
+# Generated evaluation outputs
+outputs/
