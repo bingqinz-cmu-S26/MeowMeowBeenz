@@ -16,6 +16,7 @@ final class VoiceChatModel {
     private(set) var agentState: AgentState = .idle
     private(set) var isUserSpeaking = false
     private(set) var isAgentSpeaking = false
+    private(set) var isAgentUsingContext = false
     private(set) var userTranscript = ""
     private(set) var agentTranscript = ""
 
@@ -164,6 +165,7 @@ final class VoiceChatModel {
         agentState = .idle
         isUserSpeaking = false
         isAgentSpeaking = false
+        isAgentUsingContext = false
         userTranscript = ""
         agentTranscript = ""
     }
@@ -196,7 +198,21 @@ final class VoiceChatModel {
     }
 
     fileprivate func applyTranscript(_ text: String, fromAgent: Bool) {
-        if fromAgent { agentTranscript = text } else { userTranscript = text }
+        if fromAgent {
+            let display = VoiceTranscriptFormatter.agentDisplayText(from: text)
+            isAgentUsingContext = display.isUsingContext && display.text.isEmpty
+            if !display.text.isEmpty {
+                agentTranscript = display.text
+            }
+        } else {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let previous = userTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty, trimmed != previous {
+                agentTranscript = ""
+                isAgentUsingContext = false
+            }
+            userTranscript = text
+        }
     }
 
     fileprivate func applyConnection(_ state: ConnectionState, sessionID: UUID) {
@@ -209,6 +225,97 @@ final class VoiceChatModel {
 }
 
 private struct VoiceConnectTimeout: Error {}
+
+private struct AgentDisplayText {
+    let text: String
+    let isUsingContext: Bool
+}
+
+private enum VoiceTranscriptFormatter {
+    static func agentDisplayText(from rawText: String) -> AgentDisplayText {
+        let isUsingContext = rawText.localizedCaseInsensitiveContains("lookup_cat_activity")
+            || rawText.localizedCaseInsensitiveContains("<tool_call")
+
+        var text = rawText
+        text = replace(pattern: #"(?s)<tool_call>.*?</tool_call>"#, in: text)
+        text = replace(pattern: #"(?s)<tool_call>.*"#, in: text)
+        text = replace(pattern: #"(?s)\{\s*"name"\s*:\s*"lookup_cat_activity".*?\}\s*"#, in: text)
+        text = replace(pattern: #"(?s)\{\s*"time_of_day".*?\}\s*"#, in: text)
+        text = replace(pattern: #"(?s)\*[^*]{0,160}\*"#, in: text)
+        text = replace(pattern: #"```(?:json)?|```"#, in: text)
+        text = replace(pattern: #"\s+"#, in: text, with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let ownerFacing = filteredOwnerFacingSentences(from: text)
+        let displayText = ownerFacing.isEmpty ? fallbackText(for: rawText) : ownerFacing
+        return AgentDisplayText(text: displayText, isUsingContext: isUsingContext)
+    }
+
+    private static func filteredOwnerFacingSentences(from text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        let rawSentences = trimmed
+            .split(whereSeparator: { ".!?".contains($0) })
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !rawSentences.isEmpty else { return trimmed }
+
+        var seen = Set<String>()
+        let sentences = rawSentences.compactMap { sentence -> String? in
+            let lower = sentence.lowercased()
+            let isInternalStep = [
+                "let me check",
+                "let me see",
+                "let me look",
+                "i'll check",
+                "i will check",
+                "i'm checking",
+                "i am checking",
+                "check on ",
+                "looking up",
+                "activity log",
+                "activity timeline",
+                "tool_call",
+                "lookup_cat_activity",
+                "arguments",
+                "don't have the key",
+                "do not have the key",
+                "only know what you've told me",
+                "only know what you have told me",
+                "i don't have access",
+                "i do not have access",
+                "meow",
+                "ears swivel",
+                "tail flick"
+            ].contains { lower.contains($0) }
+
+            guard !isInternalStep else { return nil }
+            guard !seen.contains(lower) else { return nil }
+            seen.insert(lower)
+            return sentence.hasSuffix(".") ? sentence : "\(sentence)."
+        }
+
+        return sentences.joined(separator: " ")
+    }
+
+    private static func fallbackText(for rawText: String) -> String {
+        let lower = rawText.lowercased()
+        if lower.contains("key") || lower.contains("access") {
+            return "I can't read the activity timeline clearly right now. Try asking again with the cat's name and a time, like “What was Saffron doing this morning?”"
+        }
+        return "I didn't catch that clearly. Could you repeat it with the cat's name or the time you want me to check?"
+    }
+
+    private static func replace(pattern: String, in text: String, with replacement: String = " ") -> String {
+        text.replacingOccurrences(
+            of: pattern,
+            with: replacement,
+            options: [.regularExpression, .caseInsensitive]
+        )
+    }
+}
 
 /// Plain (non-isolated) NSObject delegate. Extracts Sendable values on the SDK's
 /// thread, then hops to the main actor to update the observable model.

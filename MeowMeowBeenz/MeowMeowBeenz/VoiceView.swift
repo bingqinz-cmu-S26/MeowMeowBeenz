@@ -11,25 +11,28 @@ struct VoiceView: View {
                 VStack(spacing: 18) {
                     hero
 
-                    SoftCard(title: "Conversation", subtitle: "Live status", icon: "dot.radiowaves.left.and.right", accent: .indigo) {
+                    SoftCard(title: "Conversation", subtitle: "Owner view", icon: "dot.radiowaves.left.and.right", accent: .indigo) {
                         StatusRow(
                             icon: "mic.fill",
                             tone: .blue,
-                            title: "You",
+                            title: "Your question",
                             active: voice.isUserSpeaking,
                             activeLabel: "Speaking…",
                             idleLabel: voice.phase == .connected ? "Waiting for you" : "—",
-                            transcript: voice.userTranscript
+                            transcript: voice.userTranscript,
+                            placeholder: voice.phase == .connected ? "Ask about a cat, a time of day, or a health signal." : "Start a conversation to talk with Beenz."
                         )
                         Divider()
                         StatusRow(
                             icon: "cat.fill",
                             tone: .pink,
-                            title: "Beenz",
-                            active: voice.isThinking || voice.isAgentSpeaking,
-                            activeLabel: voice.isThinking ? "Thinking…" : "Speaking…",
+                            title: "Beenz answer",
+                            active: voice.isThinking || voice.isAgentSpeaking || voice.isAgentUsingContext,
+                            activeLabel: beenzStatusLabel,
                             idleLabel: voice.phase == .connected ? "Listening" : "—",
-                            transcript: voice.agentTranscript
+                            transcript: voice.agentTranscript,
+                            placeholder: voice.phase == .connected ? "A clear answer will appear here." : "Beenz will answer here once connected.",
+                            contextActive: voice.isAgentUsingContext
                         )
                     }
 
@@ -102,6 +105,12 @@ struct VoiceView: View {
         }
     }
 
+    private var beenzStatusLabel: String {
+        if voice.isAgentUsingContext { return "Checking records" }
+        if voice.isThinking { return "Thinking…" }
+        return "Speaking…"
+    }
+
     private func toggle() {
         Task {
             if voice.isActive {
@@ -126,9 +135,11 @@ private struct StatusRow: View {
     let activeLabel: String
     let idleLabel: String
     let transcript: String
+    let placeholder: String
+    var contextActive = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .foregroundStyle(active ? tone : .secondary)
@@ -137,12 +148,33 @@ private struct StatusRow: View {
                 Spacer()
                 SoftChip(text: active ? activeLabel : idleLabel, tone: active ? tone : .gray)
             }
+            if contextActive {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Looking through the recent activity timeline.")
+                        .font(.footnote.weight(.medium))
+                }
+                .foregroundStyle(tone)
+                .padding(.leading, 32)
+            }
+
             if !transcript.isEmpty {
                 Text(transcript)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(title == "Beenz answer" ? .body.weight(.medium) : .callout)
+                    .lineSpacing(3)
+                    .foregroundStyle(title == "Beenz answer" ? .primary : .secondary)
+                    .padding(.leading, 32)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !contextActive {
+                Text(placeholder)
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 32)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .padding(.vertical, 2)
     }
 }

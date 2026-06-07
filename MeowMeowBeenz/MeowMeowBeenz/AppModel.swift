@@ -282,8 +282,11 @@ final class AppModel {
         guard let mockData else { return }
         cats = mockData.cats
         ensureSelectedCat()
-        householdEvents = mockData.events
-        events = eventsForSelectedCat(from: mockData.events, catId: catId ?? selectedCatId)
+        let sortedEvents = mockData.events.sorted {
+            (Format.date($0.time) ?? .distantPast) > (Format.date($1.time) ?? .distantPast)
+        }
+        householdEvents = sortedEvents
+        events = eventsForSelectedCat(from: sortedEvents, catId: catId ?? selectedCatId)
         applyMockReports(range: range)
     }
 

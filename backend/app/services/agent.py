@@ -6,6 +6,7 @@ from urllib.request import Request, urlopen
 
 from app.config import settings
 from app.services.health_rules import build_range_report
+from app.services.mock_store import get_public_cats
 
 CAT_SPECIFIC_TERMS = {
     "meow", "meows", "yowl", "yowling", "vocal", "vocalization", "sound", "cry", "cried",
@@ -94,7 +95,7 @@ def call_minimax(
         "model": settings.minimax_model,
         "messages": build_messages(question, timeline[-10:], report, history=history or [], cat_context=cat_context),
         "temperature": 0.2,
-        "max_tokens": 260,
+        "max_tokens": 140,
         "stream": False,
     }
     request = Request(
@@ -130,20 +131,25 @@ def build_messages(
 ) -> list[dict]:
     system = (
         "You are MeowMeowBeenz's cat wellness assistant. "
-        "Answer directly using only the provided timeline, daily report, and recent chat history. "
+        "Answer directly using only the provided cat profiles, timeline, daily report, and recent chat history. "
         "The backend has already resolved whether the owner means one cat or the whole household. "
-        "If selected_cat is present, answer about that cat only. If selected_cat is null, answer about the household only. "
+        "If selected_cat_profile is present, answer profile questions such as age, birth date, and device from it. "
+        "If selected_cat is present, answer behavior questions about that cat only. If selected_cat is null, answer about the household only. "
         "Do not deliberate, reason step-by-step, or explain your process. "
+        "Answer exactly the owner's current question and then stop. Never invent follow-up User or AI turns. "
         "Start with the answer. "
         "You may discuss behavior, intent, routine changes, and monitoring suggestions. "
         "Never diagnose disease or claim certainty. "
-        "Do not include hidden reasoning, chain-of-thought, XML tags, markdown tables, or emoji. "
+        "Do not include hidden reasoning, chain-of-thought, XML tags, markdown tables, source lists, signatures, or emoji. "
+        "Do not ask promotional follow-up questions like whether the owner wants human-year conversion. "
         "If risk is non-trivial, recommend observation, checking food/water/litter, reviewing clips, or contacting a vet if patterns persist. "
         "Be concise, warm, and practical in 2-4 short sentences. Reply in the same language as the owner."
     )
     context = {
         "owner_question": question,
         "selected_cat": cat_context,
+        "selected_cat_profile": cat_context,
+        "cat_profiles": cat_profiles_for_context(),
         "daily_report": report,
         "timeline_recent_first": list(reversed(timeline)),
         "recent_chat_history": history[-8:],
@@ -157,6 +163,14 @@ def build_messages(
 def clean_model_text(text: str) -> str:
     cleaned = re.sub(r"<think>.*?</think>", "", str(text), flags=re.DOTALL | re.IGNORECASE)
     cleaned = re.sub(r"<[^>]+>", "", cleaned)
+    cleaned = re.split(
+        r"\n\s*(?:User|Owner|AI|Assistant|MeowMeowBeenz)\s*(?:\n|$)|"
+        r"\n\s*\|.*\|.*\n|"
+        r"\b(?:Would you like|Do you want|Please let me know)\b",
+        cleaned,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
     return cleaned.strip()
 
 
@@ -215,7 +229,8 @@ def ask_agent(
     history: list[dict] | None = None,
 ) -> dict:
     history = history or []
-    resolution = resolve_cat_context(question, timeline, history)
+    profiles = cat_profiles_for_context()
+    resolution = resolve_cat_context(question, timeline, history, profiles)
     if resolution["needs_clarification"]:
         return {"provider": "local", "text": clarification_text(resolution["cats"])}
 
@@ -223,10 +238,13 @@ def ask_agent(
     range_name = (report or {}).get("range", "day") if isinstance(report, dict) else "day"
     report_data = build_range_report(scoped_timeline, range_name) if resolution["cat"] else (report or build_range_report(timeline, "day"))
     cat_context = resolution["cat"]
+    local_profile_answer = answer_profile_question(question, cat_context)
     try:
         answer = call_minimax(question, scoped_timeline, report_data, history=history, cat_context=cat_context)
         return {"provider": "minimax", "text": answer}
     except Exception:
+        if local_profile_answer:
+            return {"provider": "local", "text": local_profile_answer}
         return {
             "provider": "local",
             "text": (
@@ -236,8 +254,8 @@ def ask_agent(
         }
 
 
-def resolve_cat_context(question: str, timeline: list[dict], history: list[dict]) -> dict:
-    cats = cats_from_timeline(timeline)
+def resolve_cat_context(question: str, timeline: list[dict], history: list[dict], profiles: list[dict] | None = None) -> dict:
+    cats = merge_cat_sources(profiles or [], cats_from_timeline(timeline))
     cat = detect_cat_in_text(question, cats)
     if cat is None and uses_contextual_reference(question):
         cat = detect_cat_in_history(history, cats, current_question=question)
@@ -260,6 +278,48 @@ def cats_from_timeline(timeline: list[dict]) -> list[dict]:
         if not cat_id or not cat_name:
             continue
         by_id.setdefault(cat_id, {"id": cat_id, "name": cat_name})
+    return sorted(by_id.values(), key=lambda item: item["name"].lower())
+
+
+def answer_profile_question(question: str, cat: dict | None) -> str | None:
+    if not cat:
+        return None
+
+    words = set(re.findall(r"[a-z0-9]+", question.lower()))
+    name = cat.get("name", "This cat")
+    if words & {"old", "age", "aged"} and cat.get("age"):
+        return f"{name} is {cat['age']} old."
+    if words & {"birthday", "birthdate", "born"} and cat.get("birthDate"):
+        return f"{name}'s recorded birth date is {cat['birthDate']}."
+    if words & {"camera", "device"} and cat.get("device"):
+        return f"{name} is currently linked to {cat['device']}."
+    return None
+
+
+def cat_profiles_for_context() -> list[dict]:
+    profiles: list[dict] = []
+    for cat in get_public_cats():
+        profiles.append(
+            {
+                "id": cat.get("id"),
+                "name": cat.get("name"),
+                "age": cat.get("age"),
+                "birthDate": cat.get("birthDate"),
+                "device": cat.get("device"),
+            }
+        )
+    return profiles
+
+
+def merge_cat_sources(primary: list[dict], secondary: list[dict]) -> list[dict]:
+    by_id: dict[str, dict] = {}
+    for cat in [*secondary, *primary]:
+        cat_id = str(cat.get("id") or "").strip()
+        name = str(cat.get("name") or "").strip()
+        if not cat_id or not name:
+            continue
+        existing = by_id.get(cat_id, {})
+        by_id[cat_id] = {**existing, **cat, "id": cat_id, "name": name}
     return sorted(by_id.values(), key=lambda item: item["name"].lower())
 
 

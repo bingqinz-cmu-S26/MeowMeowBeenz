@@ -56,8 +56,18 @@ enum MockDataStore {
 
     private static func scopedEvents(_ events: [TimelineEvent], range: ReportRange) -> [TimelineEvent] {
         guard let latest = events.compactMap({ Format.date($0.time) }).max() else { return events }
-        let days = range == .month ? 30 : range == .week ? 7 : 1
-        let start = Calendar.current.date(byAdding: .day, value: -days, to: latest) ?? latest
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let dayStart = calendar.startOfDay(for: latest)
+        let start: Date
+        switch range {
+        case .day:
+            start = dayStart
+        case .week:
+            start = calendar.date(byAdding: .day, value: -6, to: dayStart) ?? dayStart
+        case .month:
+            start = calendar.date(byAdding: .day, value: -29, to: dayStart) ?? dayStart
+        }
         return events.filter { event in
             guard let date = Format.date(event.time) else { return false }
             return date >= start && date <= latest
@@ -110,7 +120,7 @@ enum MockDataStore {
 
     private static func label(for range: ReportRange) -> String {
         switch range {
-        case .day: return "Sunday, Jun 07"
+        case .day: return "Today"
         case .week: return "Last 7 days"
         case .month: return "Last 30 days"
         }

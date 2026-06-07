@@ -77,7 +77,7 @@ struct ReportsView: View {
 
                         SoftCard(
                             title: "Activity counts",
-                            subtitle: "Last \(report.range) window",
+                            subtitle: report.dateLabel,
                             icon: "chart.pie",
                             accent: .blue
                         ) {
