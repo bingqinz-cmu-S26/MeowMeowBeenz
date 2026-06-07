@@ -1,0 +1,36 @@
+@media (max-width: 860px) {
+  .app-shell {
+    width: min(100% - 20px, 1180px);
+    padding-top: 14px;
+  }
+  .topbar,
+  .live-grid,
+  .agent-layout {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+  .topbar {
+    align-items: stretch;
+  }
+  .tabs {
+    width: 100%;
+  }
+  .tab-button {
+    min-width: 0;
+    padding-inline: 8px;
+  }
+  .timeline,
+  .alerts-list,
+  .metric-grid,
+  .status-details {
+    grid-template-columns: 1fr;
+  }
+  .controls,
+  .chat-form {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+  .chat-message {
+    max-width: 100%;
+  }
+}

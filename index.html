@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MeowMeowBeenz</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./responsive.css" />
+    <link rel="stylesheet" href="./prd.css?v=12" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Behavioral health signals</p>
+          <h1>MeowMeowBeenz</h1>
+        </div>
+        <nav class="tabs" aria-label="Primary">
+          <button class="tab-button active" data-tab="home" type="button">Home</button>
+          <button class="tab-button" data-tab="live" type="button">Live</button>
+          <button class="tab-button" data-tab="agent" type="button">Agent</button>
+          <button class="tab-button" data-tab="activity" type="button">Activity</button>
+          <button class="tab-button" data-tab="health" type="button">Health</button>
+        </nav>
+      </header>
+
+      <section id="home" class="tab-panel active" aria-labelledby="Home">
+        <section class="home-hero">
+          <div class="home-greeting">
+            <div>
+              <p id="homeGreetingLabel" class="eyebrow">Hello</p>
+              <h2 id="homeGreeting">Welcome back</h2>
+              <p id="homeSummary" class="home-summary"></p>
+            </div>
+            <div id="homeMetricGrid" class="home-stats"></div>
+            <div id="homeInsight" class="home-insight"></div>
+          </div>
+
+          <aside class="home-preview-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Cat preview</p>
+                <h2>Your household</h2>
+              </div>
+              <span id="homeOverallBadge" class="risk-badge normal">nice</span>
+            </div>
+            <div id="homePreview" class="cat-preview"></div>
+          </aside>
+        </section>
+
+        <section class="cat-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Cat profiles</p>
+              <h2>Cats at home</h2>
+            </div>
+            <span id="homeCatCount" class="status-pill">0 cats</span>
+          </div>
+          <div id="catRoster" class="cat-roster"></div>
+        </section>
+
+        <section class="home-grid">
+          <article class="tool-panel action-card" data-go-tab="live">
+            <p class="eyebrow">Next</p>
+            <h3>Analyze a clip</h3>
+            <p>Upload, record, or stream audio/video to add a fresh behavior event.</p>
+          </article>
+          <article class="tool-panel action-card" data-go-tab="agent">
+            <p class="eyebrow">Ask</p>
+            <h3>Talk to Beenz</h3>
+            <p>Use MiniMax to ask what changed, why it may matter, and what to watch.</p>
+          </article>
+          <article class="tool-panel action-card" data-go-tab="health">
+            <p class="eyebrow">Watch</p>
+            <h3>Review warnings</h3>
+            <p>See appetite, litter, activity, vocalization, and multimodal conflict signals.</p>
+          </article>
+        </section>
+      </section>
+
+      <section id="live" class="tab-panel" aria-labelledby="Live">
+        <div class="live-grid">
+          <section class="tool-panel media-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Live audio/video</p>
+                <h2>Current state</h2>
+              </div>
+              <span id="mediaStatus" class="status-pill">Media off</span>
+            </div>
+            <div class="video-frame">
+              <video id="previewVideo" autoplay muted playsinline></video>
+              <div id="videoFallback" class="video-fallback">
+                <div class="cat-face" aria-hidden="true">
+                  <span></span>
+                </div>
+                <p>Camera preview appears here</p>
+              </div>
+            </div>
+            <div class="controls">
+              <button id="enableMedia" class="primary-button" type="button">Enable camera</button>
+              <label class="upload-button">Upload clip<input id="clipUpload" type="file" accept="audio/*,video/*" /></label>
+              <button id="connectLiveKit" class="secondary-button" type="button">Connect LiveKit</button>
+              <button id="analyzeNow" class="secondary-button" type="button">Analyze clip</button>
+            </div>
+            <p id="mediaMessage" class="helper-text">Upload a clip, send it to Gemini, and display the mock-event response here. Timeline is reserved for LiveKit later.</p>
+          </section>
+
+          <section class="tool-panel status-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Model output</p>
+                <h2>Right now</h2>
+              </div>
+              <span id="riskBadge" class="risk-badge normal">Normal</span>
+            </div>
+            <div id="currentStatus" class="current-status"></div>
+          </section>
+        </div>
+
+        <section class="tool-panel scenario-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Demo controls</p>
+              <h2>Inject timeline signals</h2>
+            </div>
+            <button id="seedDemo" class="ghost-button" type="button">Load demo day</button>
+          </div>
+          <div id="scenarioButtons" class="scenario-buttons"></div>
+        </section>
+
+        <section class="tool-panel timeline-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Context memory</p>
+              <h2>Timeline</h2>
+            </div>
+            <button id="clearTimeline" class="ghost-button" type="button">Clear</button>
+          </div>
+          <div id="timeline" class="timeline"></div>
+        </section>
+      </section>
+
+      <section id="agent" class="tab-panel" aria-labelledby="Agent">
+        <div class="agent-layout">
+          <section class="tool-panel chat-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">MiniMax-powered assistant</p>
+                <h2>Ask about your cats</h2>
+              </div>
+            </div>
+            <div id="chatLog" class="chat-log"></div>
+            <form id="chatForm" class="chat-form">
+              <input id="chatInput" type="text" autocomplete="off" placeholder="Ask: how are the cats today?" />
+              <button class="primary-button" type="submit">Ask</button>
+            </form>
+          </section>
+
+          <aside class="tool-panel prompts-panel">
+            <p class="eyebrow">Quick questions</p>
+            <div class="prompt-list">
+              <button class="prompt-button" type="button">How are the cats today?</button>
+              <button class="prompt-button" type="button">Which cat needs attention?</button>
+              <button class="prompt-button" type="button">Should I worry?</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="activity" class="tab-panel" aria-labelledby="Activity">
+        <section class="tool-panel report-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Behavior rhythm</p>
+              <h2>What happened when</h2>
+            </div>
+            <span id="activityCount" class="status-pill">0 events</span>
+          </div>
+          <p id="activitySummary" class="report-summary"></p>
+          <div id="activityRings" class="activity-rings"></div>
+          <div id="activityMetrics" class="watch-metrics"></div>
+          <div id="activityBars" class="activity-bars"></div>
+        </section>
+
+        <section class="tool-panel timeline-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Timeline</p>
+              <h2>Activity log</h2>
+            </div>
+            <div class="activity-filters">
+              <button class="filter-button active" data-filter="all" type="button">All</button>
+              <button class="filter-button" data-filter="active" type="button">Activity</button>
+              <button class="filter-button" data-filter="eating" type="button">Eating</button>
+              <button class="filter-button" data-filter="litter" type="button">Litter</button>
+              <button class="filter-button" data-filter="vocal" type="button">Vocal</button>
+              <button class="filter-button" data-filter="warning" type="button">Warnings</button>
+            </div>
+          </div>
+          <div id="activityList" class="activity-list"></div>
+        </section>
+      </section>
+
+      <section id="health" class="tab-panel" aria-labelledby="Health">
+        <section class="tool-panel report-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Health report</p>
+              <h2 id="reportDate">Today</h2>
+            </div>
+            <span id="overallBadge" class="risk-badge normal">Normal</span>
+          </div>
+          <div class="range-buttons" role="group" aria-label="Health report range">
+            <button class="range-button active" data-range="day" type="button">Day</button>
+            <button class="range-button" data-range="week" type="button">Week</button>
+            <button class="range-button" data-range="month" type="button">Month</button>
+          </div>
+          <p id="reportSummary" class="report-summary"></p>
+          <div id="metricGrid" class="metric-grid"></div>
+        </section>
+
+        <section class="tool-panel alerts-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Behavior signals</p>
+              <h2>Health warnings</h2>
+            </div>
+          </div>
+          <div id="alertsList" class="alerts-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js?v=12"></script>
+  </body>
+</html>
