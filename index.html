@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mochi Monitor</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./responsive.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Behavioral health signals</p>
+          <h1>Mochi Monitor</h1>
+        </div>
+        <nav class="tabs" aria-label="Primary">
+          <button class="tab-button active" data-tab="live" type="button">Live</button>
+          <button class="tab-button" data-tab="agent" type="button">Agent</button>
+          <button class="tab-button" data-tab="health" type="button">Health</button>
+        </nav>
+      </header>
+
+      <section id="live" class="tab-panel active" aria-labelledby="Live">
+        <div class="live-grid">
+          <section class="tool-panel media-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Live audio/video</p>
+                <h2>Current state</h2>
+              </div>
+              <span id="mediaStatus" class="status-pill">Media off</span>
+            </div>
+            <div class="video-frame">
+              <video id="previewVideo" autoplay muted playsinline></video>
+              <div id="videoFallback" class="video-fallback">
+                <div class="cat-face" aria-hidden="true">
+                  <span></span>
+                </div>
+                <p>Camera preview appears here</p>
+              </div>
+            </div>
+            <div class="controls">
+              <button id="enableMedia" class="primary-button" type="button">Enable camera</button>
+              <button id="connectLiveKit" class="secondary-button" type="button">Connect LiveKit</button>
+              <button id="analyzeNow" class="secondary-button" type="button">Analyze now</button>
+            </div>
+            <p id="mediaMessage" class="helper-text">Use camera/microphone for live capture, or run the demo without media.</p>
+          </section>
+
+          <section class="tool-panel status-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Model output</p>
+                <h2>Right now</h2>
+              </div>
+              <span id="riskBadge" class="risk-badge normal">Normal</span>
+            </div>
+            <div id="currentStatus" class="current-status"></div>
+          </section>
+        </div>
+
+        <section class="tool-panel scenario-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Demo controls</p>
+              <h2>Inject timeline signals</h2>
+            </div>
+            <button id="seedDemo" class="ghost-button" type="button">Load demo day</button>
+          </div>
+          <div id="scenarioButtons" class="scenario-buttons"></div>
+        </section>
+
+        <section class="tool-panel timeline-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Context memory</p>
+              <h2>Timeline</h2>
+            </div>
+            <button id="clearTimeline" class="ghost-button" type="button">Clear</button>
+          </div>
+          <div id="timeline" class="timeline"></div>
+        </section>
+      </section>
+
+      <section id="agent" class="tab-panel" aria-labelledby="Agent">
+        <div class="agent-layout">
+          <section class="tool-panel chat-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">MiniMax-powered assistant</p>
+                <h2>Ask about Mochi</h2>
+              </div>
+            </div>
+            <div id="chatLog" class="chat-log"></div>
+            <form id="chatForm" class="chat-form">
+              <input id="chatInput" type="text" autocomplete="off" placeholder="Ask: how is Mochi today?" />
+              <button class="primary-button" type="submit">Ask</button>
+            </form>
+          </section>
+
+          <aside class="tool-panel prompts-panel">
+            <p class="eyebrow">Quick questions</p>
+            <div class="prompt-list">
+              <button class="prompt-button" type="button">How is Mochi today?</button>
+              <button class="prompt-button" type="button">Why was she meowing?</button>
+              <button class="prompt-button" type="button">Should I worry?</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="health" class="tab-panel" aria-labelledby="Health">
+        <section class="tool-panel report-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Daily report</p>
+              <h2 id="reportDate">Today</h2>
+            </div>
+            <span id="overallBadge" class="risk-badge normal">Normal</span>
+          </div>
+          <p id="reportSummary" class="report-summary"></p>
+          <div id="metricGrid" class="metric-grid"></div>
+        </section>
+
+        <section class="tool-panel alerts-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Behavior signals</p>
+              <h2>Health warnings</h2>
+            </div>
+          </div>
+          <div id="alertsList" class="alerts-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js?v=6"></script>
+  </body>
+</html>
