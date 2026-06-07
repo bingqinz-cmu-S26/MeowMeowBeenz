@@ -124,6 +124,23 @@ class ClipFileInfo(BaseModel):
     size: int
 
 
+class UploadGalleryItem(BaseModel):
+    id: str
+    ownerId: str | None = None
+    ownerUsername: str | None = None
+    createdAt: str
+    filename: str
+    mimeType: str
+    localPath: str | None = None
+    videoFileId: str | None = None
+    videoUrl: str | None = None
+    provider: str
+    summary: str
+    rawResponse: str | None = None
+    file: ClipFileInfo | None = None
+    event: TimelineEvent | None = None
+
+
 class ClipAnalysisResponse(BaseModel):
     ok: bool
     provider: str
@@ -132,3 +149,4 @@ class ClipAnalysisResponse(BaseModel):
     file: ClipFileInfo
     event: TimelineEvent | None = None
     analysis: TimelineEvent | None = None
+    galleryItem: UploadGalleryItem | None = None

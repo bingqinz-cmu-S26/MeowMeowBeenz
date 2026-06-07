@@ -27,6 +27,7 @@ final class AppModel {
     var householdEvents: [TimelineEvent] = []
     var householdReport: HealthReport?
     var reportRange: ReportRange = .day
+    var uploadGallery: [UploadGalleryItem] = []
 
     // Chat
     var chat: [ChatMessage] = [
@@ -43,6 +44,7 @@ final class AppModel {
     var errorMessage: String?
 
     private let mockData = MockDataStore.load()
+    private let uploadGalleryKey = "uploadGallery"
     let usesMockData = true
 
     var isSignedIn: Bool { token != nil && user != nil }
@@ -55,6 +57,7 @@ final class AppModel {
         self.baseURLString = UserDefaults.standard.string(forKey: "baseURL") ?? "http://localhost:8000"
         self.token = UserDefaults.standard.string(forKey: "token")
         self.selectedCatId = UserDefaults.standard.string(forKey: "selectedCatId")
+        self.uploadGallery = Self.loadUploadGallery()
     }
 
     // MARK: Lifecycle
@@ -66,6 +69,7 @@ final class AppModel {
         if token != nil {
             await restoreSession()
         }
+        await refreshUploadGallery()
         applyMockData(catId: selectedCatId, range: reportRange)
     }
 
@@ -119,6 +123,7 @@ final class AppModel {
                 : try await client.login(username: username, password: password)
             token = auth.token
             user = auth.user
+            await refreshUploadGallery()
             applyMockData(catId: selectedCatId, range: reportRange)
         } catch {
             errorMessage = error.localizedDescription
@@ -128,6 +133,7 @@ final class AppModel {
     func signOut() {
         token = nil
         user = nil
+        uploadGallery = Self.loadUploadGallery()
         applyMockData(catId: selectedCatId, range: reportRange)
     }
 
@@ -214,12 +220,59 @@ final class AppModel {
                 insertVisibleEvent(event)
                 await refreshReports()
             }
+            recordUpload(
+                response: result,
+                fileData: fileData,
+                filename: filename,
+                mimeType: mimeType
+            )
             errorMessage = nil
             return result
         } catch {
             errorMessage = error.localizedDescription
             return nil
         }
+    }
+
+    func refreshUploadGallery() async {
+        do {
+            let remoteItems = try await client.uploadGallery()
+            let localById = Dictionary(uniqueKeysWithValues: uploadGallery.map { ($0.id, $0.localPath) })
+            uploadGallery = remoteItems.map { item in
+                guard item.localPath == nil, let localPath = localById[item.id] else { return item }
+                return item.withLocalPath(localPath)
+            }
+            saveUploadGallery()
+        } catch {
+            if uploadGallery.isEmpty {
+                uploadGallery = Self.loadUploadGallery()
+            }
+        }
+    }
+
+    func deleteUpload(_ item: UploadGalleryItem) async {
+        uploadGallery.removeAll { $0.id == item.id }
+        if let localPath = item.localPath {
+            try? FileManager.default.removeItem(atPath: localPath)
+        }
+        saveUploadGallery()
+        do {
+            try await client.deleteUploadGalleryItem(item.id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func videoURL(for item: UploadGalleryItem) -> URL? {
+        if let localPath = item.localPath,
+           FileManager.default.fileExists(atPath: localPath) {
+            return URL(fileURLWithPath: localPath)
+        }
+        if let videoUrl = item.videoUrl,
+           let url = URL(string: videoUrl) {
+            return url
+        }
+        return client.uploadGalleryVideoURL(itemId: item.id)
     }
 
     func mimeType(for url: URL) -> String {
@@ -300,5 +353,69 @@ final class AppModel {
     private func eventsForSelectedCat(from events: [TimelineEvent], catId: String?) -> [TimelineEvent] {
         guard let catId, !catId.isEmpty else { return events }
         return events.filter { $0.catId == catId }
+    }
+
+    private func recordUpload(
+        response: ClipAnalysisResponse,
+        fileData: Data,
+        filename: String,
+        mimeType: String
+    ) {
+        let remoteItem = response.galleryItem
+        let id = remoteItem?.id ?? "upload_\(UUID().uuidString)"
+        let localPath = saveUploadFile(id: id, filename: filename, data: fileData)
+        let item = UploadGalleryItem(
+            id: id,
+            ownerId: remoteItem?.ownerId,
+            ownerUsername: remoteItem?.ownerUsername,
+            createdAt: remoteItem?.createdAt ?? ISO8601DateFormatter().string(from: Date()),
+            filename: remoteItem?.filename ?? response.file?.name ?? filename,
+            mimeType: remoteItem?.mimeType ?? response.file?.type ?? mimeType,
+            localPath: localPath,
+            videoFileId: remoteItem?.videoFileId,
+            videoUrl: remoteItem?.videoUrl,
+            provider: remoteItem?.provider ?? response.provider,
+            summary: remoteItem?.summary ?? response.text,
+            rawResponse: remoteItem?.rawResponse ?? response.rawText,
+            file: remoteItem?.file ?? response.file,
+            event: remoteItem?.event ?? response.event ?? response.analysis
+        )
+        uploadGallery.removeAll { $0.id == item.id }
+        uploadGallery.insert(item, at: 0)
+        uploadGallery = Array(uploadGallery.prefix(24))
+        saveUploadGallery()
+    }
+
+    private func saveUploadFile(id: String, filename: String, data: Data) -> String? {
+        guard let directory = Self.uploadDirectory() else { return nil }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let ext = URL(fileURLWithPath: filename).pathExtension
+        let sanitizedExt = ext.isEmpty ? "mov" : ext
+        let url = directory.appendingPathComponent("\(id).\(sanitizedExt)")
+        do {
+            try data.write(to: url, options: .atomic)
+            return url.path
+        } catch {
+            return nil
+        }
+    }
+
+    private func saveUploadGallery() {
+        guard let data = try? JSONEncoder().encode(uploadGallery) else { return }
+        UserDefaults.standard.set(data, forKey: uploadGalleryKey)
+    }
+
+    private static func loadUploadGallery() -> [UploadGalleryItem] {
+        guard let data = UserDefaults.standard.data(forKey: "uploadGallery"),
+              let items = try? JSONDecoder().decode([UploadGalleryItem].self, from: data) else {
+            return []
+        }
+        return items
+    }
+
+    private static func uploadDirectory() -> URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first?
+            .appendingPathComponent("MeowMeowBeenzUploads", isDirectory: true)
     }
 }

@@ -215,7 +215,25 @@ struct APIClient: Sendable {
                                  method: "POST",
                                  body: body,
                                  headers: ["Content-Type": contentType],
+                                 authorized: true,
                                  as: ClipAnalysisResponse.self)
+    }
+
+    func uploadGallery() async throws -> [UploadGalleryItem] {
+        try await request("/api/analyze-clip/gallery",
+                          authorized: true,
+                          as: UploadGalleryResponse.self).items
+    }
+
+    func deleteUploadGalleryItem(_ id: String) async throws {
+        _ = try await request("/api/analyze-clip/gallery/\(id)",
+                              method: "DELETE",
+                              authorized: true,
+                              as: BasicOKResponse.self)
+    }
+
+    func uploadGalleryVideoURL(itemId: String) -> URL? {
+        URL(string: "/api/analyze-clip/gallery/\(itemId)/video", relativeTo: baseURL)
     }
 
     private static func multipartBody(fileFieldName: String,
@@ -237,4 +255,8 @@ struct APIClient: Sendable {
         append("--\(boundary)--\(lineBreak)")
         return body
     }
+}
+
+private struct BasicOKResponse: Codable {
+    let ok: Bool
 }

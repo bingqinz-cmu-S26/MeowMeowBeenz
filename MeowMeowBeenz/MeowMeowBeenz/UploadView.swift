@@ -2,6 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 import PhotosUI
+import AVFoundation
+import AVKit
 
 struct UploadView: View {
     @Environment(AppModel.self) private var app
@@ -16,85 +18,83 @@ struct UploadView: View {
     @State private var lastEvent: TimelineEvent?
     @State private var lastFile: ClipFileInfo?
     @State private var lastError: String?
+    @State private var playbackItem: VideoPlaybackItem?
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Source") {
-                    Button(action: captureWithCamera) {
-                        Label("Take a video", systemImage: "video.badge.plus")
-                    }
-                    .disabled(!CameraVideoPicker.canRecordVideo)
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .videos) {
-                        Label("Pick from Photos", systemImage: "photo.on.rectangle")
-                    }
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    UploadSourcePanel(
+                        canRecordVideo: CameraVideoPicker.canRecordVideo,
+                        isAnalyzing: isAnalyzing,
+                        capture: captureWithCamera,
+                        selectedPhotoItem: $selectedPhotoItem
+                    )
 
-                if isAnalyzing {
-                    HStack {
-                        ProgressView()
-                        Text("Analyzing video…")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if let event = lastEvent {
-                    Section("Latest result") {
-                        ClipResultView(
-                            event: event,
-                            provider: lastProvider,
-                            file: lastFile
+                    if isAnalyzing || lastError != nil || statusMessage != nil {
+                        UploadStatusCard(
+                            isAnalyzing: isAnalyzing,
+                            message: statusMessage,
+                            error: lastError
                         )
                     }
-                } else if let summary = lastSummary {
-                    Section("Latest result") {
-                        Text(cleanModelText(summary)).font(.footnote).foregroundStyle(.secondary)
-                        if let provider = lastProvider {
-                            Text("Provider: \(provider)")
+
+                    if let event = lastEvent {
+                        SoftCard(
+                            title: "Latest analysis",
+                            subtitle: "Saved to gallery",
+                            icon: "sparkles.tv",
+                            accent: Risk(event.riskLevel).color
+                        ) {
+                            ClipResultView(
+                                event: event,
+                                provider: lastProvider,
+                                file: lastFile
+                            )
+                        }
+                    } else if let summary = lastSummary {
+                        SoftCard(
+                            title: "Latest analysis",
+                            subtitle: lastProvider.map { "\($0.capitalized) result" },
+                            icon: "sparkles",
+                            accent: .purple
+                        ) {
+                            Text(cleanModelText(summary))
                                 .font(.footnote)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                }
 
-                if let rawResponse = lastRawResponse, !rawResponse.isEmpty {
-                    Section(lastProvider == "gemini" ? "Gemini raw response" : "Model raw response") {
-                        DisclosureGroup("Show raw response") {
-                            ScrollView(.vertical) {
-                                Text(rawResponse)
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .padding(.vertical, 6)
+                    UploadGallerySection(
+                        items: app.uploadGallery,
+                        videoURL: { item in app.videoURL(for: item) },
+                        play: { item in
+                            if let url = app.videoURL(for: item) {
+                                playbackItem = VideoPlaybackItem(url: url)
+                            } else {
+                                lastError = "This video is not available for playback."
                             }
-                            .frame(minHeight: 160, maxHeight: 360)
+                        },
+                        delete: { item in
+                            Task { await app.deleteUpload(item) }
                         }
-                    }
+                    )
                 }
-
-                if let error = lastError {
-                    Text(error)
-                        .foregroundStyle(.red)
-                        .font(.footnote)
-                }
-
-                if let message = statusMessage {
-                    HStack(alignment: .top) {
-                        Text(message)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                .padding(16)
             }
-            .listStyle(.insetGrouped)
+            .background(AppBackdrop())
             .navigationTitle("Upload")
+            .task {
+                await app.refreshUploadGallery()
+            }
             .sheet(isPresented: $showCamera) {
                 CameraVideoPicker { result in
                     showCamera = false
                     Task { await handlePickedVideo(result: result) }
                 }
+            }
+            .sheet(item: $playbackItem) { item in
+                VideoPlayerSheet(url: item.url)
             }
             .onChange(of: selectedPhotoItem) { _, item in
                 Task { await analyzePhotoItem(item) }
@@ -227,6 +227,448 @@ struct UploadView: View {
 private extension String {
     func ifEmpty(_ fallback: String) -> String {
         isEmpty ? fallback : self
+    }
+}
+
+private struct UploadSourcePanel: View {
+    let canRecordVideo: Bool
+    let isAnalyzing: Bool
+    let capture: () -> Void
+    @Binding var selectedPhotoItem: PhotosPickerItem?
+
+    var body: some View {
+        SoftCard(
+            title: "Source",
+            subtitle: "Create a new memory for the analysis gallery",
+            icon: "plus.viewfinder",
+            accent: .blue
+        ) {
+            VStack(spacing: 10) {
+                Button(action: capture) {
+                    UploadSourceRow(
+                        title: "Take a video",
+                        subtitle: canRecordVideo ? "Capture a live cat moment" : "Camera unavailable here",
+                        systemImage: "video.badge.plus",
+                        accent: .blue
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canRecordVideo || isAnalyzing)
+
+                Divider()
+
+                PhotosPicker(selection: $selectedPhotoItem, matching: .videos) {
+                    UploadSourceRow(
+                        title: "Pick from Photos",
+                        subtitle: "Analyze an existing clip",
+                        systemImage: "photo.on.rectangle",
+                        accent: .cyan
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isAnalyzing)
+            }
+        }
+    }
+}
+
+private struct UploadSourceRow: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: systemImage)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(accent)
+                .frame(width: 34)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 4)
+    }
+}
+
+private struct UploadStatusCard: View {
+    let isAnalyzing: Bool
+    let message: String?
+    let error: String?
+
+    var body: some View {
+        SoftCard(accent: error == nil ? .blue : .red) {
+            HStack(alignment: .top, spacing: 12) {
+                if isAnalyzing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: error == nil ? "checkmark.circle" : "exclamationmark.triangle")
+                        .foregroundStyle(error == nil ? .green : .red)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(error ?? message ?? "Ready to analyze.")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(error == nil ? Color.secondary : Color.red)
+                    if isAnalyzing {
+                        Text("The result will be saved as a gallery card.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct UploadGallerySection: View {
+    let items: [UploadGalleryItem]
+    let videoURL: (UploadGalleryItem) -> URL?
+    let play: (UploadGalleryItem) -> Void
+    let delete: (UploadGalleryItem) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Analysis Gallery")
+                        .font(.title3.weight(.bold))
+                    Text("\(items.count) saved \(items.count == 1 ? "moment" : "moments")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if !items.isEmpty {
+                    Image(systemName: "square.grid.2x2")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if items.isEmpty {
+                EmptyUploadGalleryView()
+            } else {
+                LazyVStack(spacing: 14) {
+                    ForEach(items) { item in
+                        UploadGalleryCard(
+                            item: item,
+                            videoURL: videoURL(item),
+                            play: { play(item) },
+                            delete: { delete(item) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct EmptyUploadGalleryView: View {
+    var body: some View {
+        SoftCard(accent: .purple) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: "photo.stack")
+                    .font(.largeTitle)
+                    .foregroundStyle(.purple)
+                Text("Your uploaded cat moments will live here.")
+                    .font(.headline.weight(.semibold))
+                Text("Each new video creates a saved card with the mood insight, risk level, confidence, and source file details.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+private struct UploadGalleryCard: View {
+    let item: UploadGalleryItem
+    let videoURL: URL?
+    let play: () -> Void
+    let delete: () -> Void
+
+    private var event: TimelineEvent? { item.event }
+    private var risk: Risk { Risk(event?.riskLevel ?? "normal") }
+
+    var body: some View {
+        SoftCard(accent: risk.color) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
+                    UploadPoster(
+                        event: event,
+                        filename: item.filename,
+                        risk: risk,
+                        videoURL: videoURL,
+                        play: play
+                    )
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(event?.state ?? "Cat mood insight")
+                                    .font(.headline.weight(.semibold))
+                                    .lineLimit(2)
+                                Text(Format.relative(item.createdAt))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 8)
+                            RiskBadge(level: event?.riskLevel ?? "normal")
+                        }
+
+                        Text(cleanSummary(item.summary, event: event))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                if let event {
+                    HStack(spacing: 8) {
+                        GalleryMetric(
+                            title: "Mood",
+                            value: prettify(event.intent),
+                            icon: "heart.text.square"
+                        )
+                        GalleryMetric(
+                            title: "Sound",
+                            value: prettify(event.soundType),
+                            icon: "waveform"
+                        )
+                        GalleryMetric(
+                            title: "Confidence",
+                            value: Format.percent(event.confidence),
+                            icon: "gauge.with.dots.needle.bottom.50percent"
+                        )
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Label(item.provider.capitalized, systemImage: "sparkles")
+                    Text(fileLabel(item.file, fallback: item.mimeType))
+                    Spacer()
+                    Button(action: play) {
+                        Image(systemName: "play.circle.fill")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(videoURL == nil)
+                    Button(role: .destructive, action: delete) {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                }
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+
+                if let raw = item.rawResponse, !raw.isEmpty {
+                    DisclosureGroup("Raw response") {
+                        Text(raw)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 6)
+                    }
+                    .font(.caption)
+                }
+            }
+        }
+    }
+
+    private func cleanSummary(_ summary: String, event: TimelineEvent?) -> String {
+        let text = event?.summary ?? summary
+        return text
+            .replacingOccurrences(of: "```json", with: "")
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func prettify(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: ".", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .split(separator: " ")
+            .map { word in word.prefix(1).uppercased() + word.dropFirst() }
+            .joined(separator: " ")
+    }
+
+    private func fileLabel(_ file: ClipFileInfo?, fallback: String) -> String {
+        guard let file, let size = file.size else { return fallback }
+        let mb = Double(size) / 1_048_576
+        if mb >= 0.1 {
+            return String(format: "%.1f MB", mb)
+        }
+        return "\(size) bytes"
+    }
+}
+
+private struct UploadPoster: View {
+    let event: TimelineEvent?
+    let filename: String
+    let risk: Risk
+    let videoURL: URL?
+    let play: () -> Void
+
+    @State private var thumbnail: UIImage?
+
+    var body: some View {
+        Button(action: play) {
+            ZStack(alignment: .bottomLeading) {
+                Group {
+                    if let thumbnail {
+                        Image(uiImage: thumbnail)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [risk.color.opacity(0.26), Color.blue.opacity(0.14), Color.white.opacity(0.22)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        Image(systemName: iconName)
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundStyle(risk.color)
+                    }
+                }
+                .frame(width: 96, height: 118)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.5)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                Image(systemName: "play.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(9)
+                    .background(risk.color.opacity(0.86), in: Circle())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Video")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.9))
+                    Text(filename)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .foregroundStyle(.white.opacity(0.86))
+                }
+                .padding(8)
+            }
+            .frame(width: 96, height: 118)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.white.opacity(0.55), lineWidth: 0.8)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(videoURL == nil)
+        .task(id: videoURL?.absoluteString ?? filename) {
+            await loadThumbnail()
+        }
+    }
+
+    @MainActor
+    private func loadThumbnail() async {
+        guard thumbnail == nil, let videoURL else { return }
+        let asset = AVURLAsset(url: videoURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 360, height: 360)
+        let preferredTime = CMTime(seconds: 0.45, preferredTimescale: 600)
+        if let image = try? generator.copyCGImage(at: preferredTime, actualTime: nil) {
+            thumbnail = UIImage(cgImage: image)
+            return
+        }
+        if let image = try? generator.copyCGImage(at: .zero, actualTime: nil) {
+            thumbnail = UIImage(cgImage: image)
+        }
+    }
+
+    private var iconName: String {
+        guard let event else { return "play.rectangle.fill" }
+        if event.behaviorLabel.contains("eating") { return "fork.knife.circle.fill" }
+        if event.behaviorLabel.contains("play") { return "sparkles.rectangle.stack.fill" }
+        if event.soundType.contains("yowl") || event.soundType.contains("meow") { return "waveform.circle.fill" }
+        if event.behaviorLabel.contains("rest") || event.behaviorLabel.contains("lying") { return "moon.circle.fill" }
+        return "play.rectangle.fill"
+    }
+}
+
+private struct VideoPlaybackItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct VideoPlayerSheet: View {
+    let url: URL
+    @State private var player: AVPlayer
+
+    init(url: URL) {
+        self.url = url
+        _player = State(initialValue: AVPlayer(url: url))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VideoPlayer(player: player)
+                .ignoresSafeArea(edges: .bottom)
+                .navigationTitle("Cat Moment")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ShareLink(item: url) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                }
+                .onAppear {
+                    player.play()
+                }
+                .onDisappear {
+                    player.pause()
+                }
+        }
+    }
+}
+
+private struct GalleryMetric: View {
+    let title: String
+    let value: String
+    let icon: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .padding(10)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

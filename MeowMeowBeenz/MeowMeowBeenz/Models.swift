@@ -132,4 +132,49 @@ struct ClipAnalysisResponse: Codable {
     let file: ClipFileInfo?
     let event: TimelineEvent?
     let analysis: TimelineEvent?
+    let galleryItem: UploadGalleryItem?
+}
+
+struct UploadGalleryItem: Codable, Identifiable {
+    let id: String
+    let ownerId: String?
+    let ownerUsername: String?
+    let createdAt: String
+    let filename: String
+    let mimeType: String
+    let localPath: String?
+    let videoFileId: String?
+    let videoUrl: String?
+    let provider: String
+    let summary: String
+    let rawResponse: String?
+    let file: ClipFileInfo?
+    let event: TimelineEvent?
+}
+
+struct UploadGalleryResponse: Codable {
+    let ok: Bool
+    let items: [UploadGalleryItem]
+    let source: String?
+}
+
+extension UploadGalleryItem {
+    func withLocalPath(_ localPath: String?) -> UploadGalleryItem {
+        UploadGalleryItem(
+            id: id,
+            ownerId: ownerId,
+            ownerUsername: ownerUsername,
+            createdAt: createdAt,
+            filename: filename,
+            mimeType: mimeType,
+            localPath: localPath,
+            videoFileId: videoFileId,
+            videoUrl: videoUrl,
+            provider: provider,
+            summary: summary,
+            rawResponse: rawResponse,
+            file: file,
+            event: event
+        )
+    }
 }
