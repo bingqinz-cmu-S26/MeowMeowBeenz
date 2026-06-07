@@ -78,10 +78,10 @@
   ],
   "cats": [
     {
-      "id": "mochi",
-      "name": "Mochi",
+      "id": "luna",
+      "name": "Luna",
       "breed": "Domestic Shorthair",
-      "ageYears": 3,
+      "ageYears": 4,
       "timeline": [
         {
           "mood": "sleepy",
@@ -140,10 +140,10 @@
       ]
     },
     {
-      "id": "luna",
-      "name": "Luna",
-      "breed": "Siamese",
-      "ageYears": 5,
+      "id": "milo",
+      "name": "Milo",
+      "breed": "Tabby mix",
+      "ageYears": 2,
       "timeline": [
         {
           "mood": "affectionate",
@@ -189,8 +189,8 @@
       ]
     },
     {
-      "id": "tofu",
-      "name": "Tofu",
+      "id": "saffron",
+      "name": "Saffron",
       "breed": "Maine Coon",
       "ageYears": 8,
       "timeline": [
@@ -213,7 +213,7 @@
           "action": "guarding the hallway",
           "timestamp": "2026-06-07T13:20:00Z",
           "confidence": 0.73,
-          "description": "Low chatter and a warning yowl as Luna approached."
+          "description": "Low chatter and a warning yowl as another cat approached."
         },
         {
           "mood": "content",
@@ -227,48 +227,6 @@
           "action": "inspecting a new package",
           "timestamp": "2026-06-07T18:40:00Z",
           "confidence": 0.62
-        }
-      ]
-    },
-    {
-      "id": "biscuit",
-      "name": "Biscuit",
-      "breed": "Tabby",
-      "ageYears": 1,
-      "timeline": [
-        {
-          "mood": "playful",
-          "action": "chasing a feather wand",
-          "timestamp": "2026-06-07T09:00:00Z",
-          "confidence": 0.83,
-          "description": "Energetic chirrups and leaping; classic kitten play."
-        },
-        {
-          "mood": "playful",
-          "action": "ambushing from behind the sofa",
-          "timestamp": "2026-06-07T12:45:00Z",
-          "confidence": 0.8
-        },
-        {
-          "mood": "restless",
-          "action": "zooming around the apartment",
-          "timestamp": "2026-06-07T15:10:00Z",
-          "confidence": 0.71,
-          "description": "Bursts of running with short sharp meows — high unspent energy."
-        },
-        {
-          "mood": "soliciting",
-          "action": "begging at the dinner table",
-          "timestamp": "2026-06-07T19:30:00Z",
-          "confidence": 0.78,
-          "description": "Chirps and meows looking for a share of the food."
-        },
-        {
-          "mood": "sleepy",
-          "action": "crashed in a sunbeam",
-          "timestamp": "2026-06-07T20:15:00Z",
-          "confidence": 0.86,
-          "description": "Asleep mid-play, fully relaxed after the zoomies."
         }
       ]
     }

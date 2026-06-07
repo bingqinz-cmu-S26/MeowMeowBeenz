@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -128,6 +129,54 @@ def clean_model_text(text: str) -> str:
     cleaned = re.sub(r"<think>.*?</think>", "", str(text), flags=re.DOTALL | re.IGNORECASE)
     cleaned = re.sub(r"<[^>]+>", "", cleaned)
     return cleaned.strip()
+
+
+def friendly_time(raw_timestamp: str | datetime | None, now: datetime | None = None) -> str:
+    """Render a readable relative time label for voice retrieval responses."""
+    if raw_timestamp is None:
+        return "recently"
+
+    event_time = _parse_datetime(raw_timestamp)
+    if event_time is None:
+        return "recently"
+
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    delta = current - event_time
+    if delta.total_seconds() < 0:
+        delta = -delta
+        suffix = "from now"
+    else:
+        suffix = "ago"
+
+    total_minutes = int(delta.total_seconds() // 60)
+    if total_minutes < 1:
+        return f"just now"
+    if total_minutes < 60:
+        return f"{total_minutes} minute{'s' if total_minutes != 1 else ''} {suffix}"
+
+    total_hours = int(total_minutes // 60)
+    if total_hours < 24:
+        return f"{total_hours} hour{'s' if total_hours != 1 else ''} {suffix}"
+
+    total_days = int(total_hours // 24)
+    if total_days < 7:
+        return f"{total_days} day{'s' if total_days != 1 else ''} {suffix}"
+    return event_time.strftime("%b %d")
+
+
+def _parse_datetime(raw_timestamp: str | datetime) -> datetime | None:
+    if isinstance(raw_timestamp, datetime):
+        return raw_timestamp.astimezone(timezone.utc)
+    if not isinstance(raw_timestamp, str) or not raw_timestamp.strip():
+        return None
+    normalized = raw_timestamp.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def ask_agent(question: str, timeline: list[dict], report: dict | None = None) -> dict:

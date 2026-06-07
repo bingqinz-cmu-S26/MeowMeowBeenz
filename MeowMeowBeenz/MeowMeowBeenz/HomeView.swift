@@ -6,52 +6,101 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if !app.apiReachable {
-                    Section {
-                        Label("Backend not reachable", systemImage: "wifi.exclamationmark")
-                            .foregroundStyle(.secondary)
-                        Text("Start the API server, then pull to refresh.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section("Today") {
-                    LabeledContent("Status") { RiskBadge(level: app.overallLevel) }
-                    if let report = app.report {
-                        Text(report.summary)
-                            .foregroundStyle(.secondary)
-                        LabeledContent("Observations", value: "\(report.totalEvents)")
-                        LabeledContent("Vocal events", value: "\(report.counts.vocal)")
-                    } else {
-                        Text("No report yet.").foregroundStyle(.secondary)
-                    }
-                }
-
-                Section("Cats") {
-                    if app.isSignedIn {
-                        if app.cats.isEmpty {
-                            Text("No cats yet — add one from your account.")
+            ScrollView {
+                VStack(spacing: 14) {
+                    if !app.apiReachable {
+                        SoftCard(
+                            title: "Backend",
+                            subtitle: "Connection status",
+                            icon: "wifi.exclamationmark",
+                            accent: .orange
+                        ) {
+                            HStack {
+                                Label("Backend not reachable", systemImage: "wifi.exclamationmark")
+                                Spacer()
+                                SoftChip(text: "Needs attention", tone: .orange)
+                            }
+                            Text("Start the API server, then pull to refresh.")
+                                .font(.footnote)
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    SoftCard(
+                        title: "Today",
+                        subtitle: "Health snapshot",
+                        icon: "heart.text.square",
+                        accent: .mint
+                    ) {
+                        LabeledContent("Overall status") { RiskBadge(level: app.overallLevel) }
+                        if let report = app.report {
+                            Text(report.summary)
+                                .font(.subheadline)
+                            Divider()
+                            HStack(spacing: 12) {
+                                SoftChip(text: "Observations · \(report.totalEvents)", tone: .blue)
+                                SoftChip(text: "Vocal · \(report.counts.vocal)", tone: .purple)
+                            }
                         } else {
-                            ForEach(app.cats) { cat in
-                                CatRow(cat: cat)
+                            Text("No report yet.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    SoftCard(
+                        title: "Cats",
+                        subtitle: app.isSignedIn ? "Your tracked companions" : "Sign in to track your cats",
+                        icon: "cat",
+                        accent: .pink
+                    ) {
+                        if app.isSignedIn {
+                            if app.cats.isEmpty {
+                                Text("No cats yet — add one from your account.")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                VStack(spacing: 8) {
+                                    ForEach(app.cats) { cat in
+                                        CatRow(cat: cat)
+                                    }
+                                }
+                            }
+                        } else {
+                            Button("Sign in to add your cats") { showingAccount = true }
+                                .buttonStyle(.borderedProminent)
+                        }
+                    }
+
+                    if let latest = app.latestEvent {
+                        SoftCard(
+                            title: "Last heard",
+                            subtitle: "Most recent event",
+                            icon: "waveform",
+                            accent: .teal
+                        ) {
+                            HStack {
+                                Text(latest.state)
+                                    .font(.body.weight(.semibold))
+                                Spacer()
+                                Text(Format.clock(latest.time))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(Format.humanize(latest.intent))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Divider()
+                            HStack {
+                                Text("Confidence")
+                                Spacer()
+                                Text(Format.percent(latest.confidence))
+                                    .fontWeight(.semibold)
                             }
                         }
-                    } else {
-                        Button("Sign in to add your cats") { showingAccount = true }
                     }
                 }
-
-                if let latest = app.latestEvent {
-                    Section("Last heard") {
-                        LabeledContent(latest.state, value: Format.clock(latest.time))
-                        LabeledContent("Interpreted as", value: Format.humanize(latest.intent))
-                        LabeledContent("Confidence", value: Format.percent(latest.confidence))
-                    }
-                }
+                .padding(16)
             }
+            .background(AppBackdrop())
             .navigationTitle("Home")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -68,6 +117,7 @@ struct HomeView: View {
 
 struct CatRow: View {
     let cat: CatProfile
+
     var body: some View {
         HStack(spacing: 12) {
             Text(cat.initials)
@@ -79,19 +129,12 @@ struct CatRow: View {
                 Text(cat.name).font(.body.weight(.semibold))
                 Text(cat.age).font(.caption).foregroundStyle(.secondary)
             }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.tertiary)
         }
-    }
-}
-
-// Hex color helper for the per-cat accent strings from the backend.
-extension Color {
-    init(hex: String) {
-        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var value: UInt64 = 0
-        Scanner(string: cleaned).scanHexInt64(&value)
-        let r = Double((value >> 16) & 0xFF) / 255
-        let g = Double((value >> 8) & 0xFF) / 255
-        let b = Double(value & 0xFF) / 255
-        self.init(red: r, green: g, blue: b)
+        .padding(10)
+        .background(Color(.secondarySystemBackground).opacity(0.62), in: RoundedRectangle(cornerRadius: 12))
     }
 }

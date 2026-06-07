@@ -17,6 +17,7 @@ struct APIClient: Sendable {
         _ path: String,
         method: String = "GET",
         body: Data? = nil,
+        headers: [String: String]? = nil,
         authorized: Bool = false,
         as type: T.Type = T.self
     ) async throws -> T {
@@ -28,7 +29,14 @@ struct APIClient: Sendable {
         req.timeoutInterval = 20
         if let body {
             req.httpBody = body
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let headers, let contentType = headers["Content-Type"] {
+                req.setValue(contentType, forHTTPHeaderField: "Content-Type")
+            } else {
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            }
+            headers?.forEach { key, value in
+                req.setValue(value, forHTTPHeaderField: key)
+            }
         }
         if authorized, let token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -50,9 +58,41 @@ struct APIClient: Sendable {
 
     private static func errorDetail(_ data: Data) -> String? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        if let detail = obj["detail"] as? String { return detail }
-        if let error = obj["error"] as? String { return error }
-        return nil
+        return parseError(from: obj)
+    }
+
+    private static func parseError(from value: Any) -> String? {
+        switch value {
+        case let dict as [String: Any]:
+            if let detail = dict["detail"] {
+                if let parsed = parseError(from: detail) {
+                    return parsed
+                }
+            }
+            if let error = dict["error"] {
+                if let parsed = parseError(from: error) {
+                    return parsed
+                }
+            }
+            if let message = dict["message"] as? String, !message.isEmpty {
+                return message
+            }
+            if let msg = dict["detail"] as? String {
+                return msg
+            }
+            return nil
+        case let array as [Any]:
+            for item in array {
+                if let parsed = parseError(from: item) {
+                    return parsed
+                }
+            }
+            return nil
+        case let text as String:
+            return text
+        default:
+            return nil
+        }
     }
 
     private static func encode<T: Encodable>(_ value: T) -> Data? {
@@ -113,5 +153,58 @@ struct APIClient: Sendable {
         struct AgentBody: Encodable { let question: String; let timeline: [TimelineEvent]; let report: HealthReport? }
         let body = AgentBody(question: question, timeline: timeline, report: report)
         return try await request("/api/agent", method: "POST", body: Self.encode(body))
+    }
+
+    func livekitToken(room: String? = nil, identity: String? = nil) async throws -> LiveKitToken {
+        struct Body: Encodable { let room: String?; let identity: String? }
+        struct Resp: Codable {
+            let ok: Bool
+            let configured: Bool?
+            let url: String?
+            let room: String?
+            let identity: String?
+            let token: String?
+        }
+        let r: Resp = try await request("/api/livekit-token", method: "POST",
+                                        body: Self.encode(Body(room: room, identity: identity)))
+        return LiveKitToken(configured: r.configured ?? true, url: r.url ?? "",
+                            room: r.room ?? "", identity: r.identity ?? "", token: r.token ?? "")
+    }
+
+    func analyzeClip(fileData: Data, filename: String, mimeType: String) async throws -> ClipAnalysisResponse {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        let body = Self.multipartBody(
+            fileFieldName: "clip",
+            fileName: filename,
+            mimeType: mimeType,
+            fileData: fileData,
+            boundary: boundary
+        )
+        let contentType = "multipart/form-data; boundary=\(boundary)"
+        return try await request("/api/analyze-clip",
+                                 method: "POST",
+                                 body: body,
+                                 headers: ["Content-Type": contentType],
+                                 as: ClipAnalysisResponse.self)
+    }
+
+    private static func multipartBody(fileFieldName: String,
+                                     fileName: String,
+                                     mimeType: String,
+                                     fileData: Data,
+                                     boundary: String) -> Data {
+        let lineBreak = "\r\n"
+        var body = Data()
+        let append = { (string: String) in
+            body.append(string.data(using: .utf8)!)
+        }
+
+        append("--\(boundary)\(lineBreak)")
+        append("Content-Disposition: form-data; name=\"\(fileFieldName)\"; filename=\"\(fileName)\"\(lineBreak)")
+        append("Content-Type: \(mimeType)\(lineBreak)\(lineBreak)")
+        body.append(fileData)
+        append(lineBreak)
+        append("--\(boundary)--\(lineBreak)")
+        return body
     }
 }

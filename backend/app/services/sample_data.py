@@ -10,7 +10,7 @@ SCENARIO_CATALOG = {
         "confidence": 0.74,
         "riskLevel": "normal",
         "signals": ["unusual_vocalization"],
-        "summary": "Mochi is active and producing repeated meows, which often points to attention or food seeking.",
+        "summary": "The cat is active and producing repeated meows, which often points to attention or food seeking.",
         "suggestion": "Check the usual routine first: food, water, door access, and recent play time.",
     },
     "lowActivity": {
@@ -21,7 +21,7 @@ SCENARIO_CATALOG = {
         "confidence": 0.82,
         "riskLevel": "watch",
         "signals": ["low_activity_alert"],
-        "summary": "Mochi has stayed in a resting posture with little movement compared with active periods.",
+        "summary": "The cat has stayed in a resting posture with little movement compared with active periods.",
         "suggestion": "Watch appetite and litter behavior. If low activity persists, consider a vet check-in.",
     },
     "nightYowl": {
@@ -43,7 +43,7 @@ SCENARIO_CATALOG = {
         "confidence": 0.77,
         "riskLevel": "watch",
         "signals": ["possible_litter_box_issue"],
-        "summary": "Mochi appears to be repeatedly digging or visiting the litter area without a clear output event.",
+        "summary": "The cat appears to be repeatedly digging or visiting the litter area without a clear output event.",
         "suggestion": "Check the litter box and monitor for urination or defecation events.",
     },
     "appetiteGap": {
@@ -54,7 +54,7 @@ SCENARIO_CATALOG = {
         "confidence": 0.71,
         "riskLevel": "watch",
         "signals": ["possible_appetite_change"],
-        "summary": "Mochi vocalized near a routine feeding context, but no eating event has been logged.",
+        "summary": "The cat vocalized near a routine feeding context, but no eating event has been logged.",
         "suggestion": "Check food and water. If appetite remains low for 24 hours, consider contacting a vet.",
     },
     "grooming": {
@@ -87,7 +87,7 @@ SCENARIO_CATALOG = {
         "confidence": 0.86,
         "riskLevel": "normal",
         "signals": [],
-        "summary": "Mochi appears to be eating with a steady posture and low vocal activity.",
+        "summary": "The cat appears to be eating with a steady posture and low vocal activity.",
         "suggestion": "Log this as a normal appetite signal.",
     },
     "play": {
@@ -98,7 +98,7 @@ SCENARIO_CATALOG = {
         "confidence": 0.79,
         "riskLevel": "normal",
         "signals": [],
-        "summary": "Mochi is moving actively with playful vocal cues.",
+        "summary": "The cat is moving actively with playful vocal cues.",
         "suggestion": "This looks like a normal enrichment or social play moment.",
     },
 }
@@ -116,33 +116,33 @@ SCENARIO_TYPES = [
 
 CAT_PROFILES = [
     {
-        "id": "mochi",
-        "name": "Mochi",
-        "initials": "Mo",
-        "age": "3 yrs",
+    "id": "luna",
+    "name": "Luna",
+        "initials": "Lu",
+    "age": "4 yrs",
         "breed": "Domestic shorthair",
-        "room": "Living room",
-        "routine": "Breakfast, couch naps, window watch",
+    "room": "Kitchen window",
+    "routine": "Breakfast, window watch, evening cuddle time",
         "accent": "#66d19e",
     },
     {
-        "id": "miso",
-        "name": "Miso",
+    "id": "milo",
+    "name": "Milo",
         "initials": "Mi",
-        "age": "5 yrs",
+    "age": "2 yrs",
         "breed": "Tabby mix",
-        "room": "Bedroom",
-        "routine": "Long sleep blocks, quiet grooming",
+    "room": "Living room",
+    "routine": "Long sleep blocks and stretch breaks",
         "accent": "#e4bd5b",
     },
     {
-        "id": "bean",
-        "name": "Bean",
-        "initials": "Be",
-        "age": "1 yr",
-        "breed": "Tuxedo",
-        "room": "Kitchen",
-        "routine": "Play bursts, snack patrol, chirps",
+    "id": "saffron",
+    "name": "Saffron",
+        "initials": "Sa",
+    "age": "8 mo",
+        "breed": "Maine Coon mix",
+    "room": "Bedroom",
+    "routine": "Play bursts, snack patrol, quick naps",
         "accent": "#76c7d8",
     },
 ]
@@ -151,6 +151,7 @@ CAT_PROFILES = [
 def normalize_event(input_data: dict) -> dict:
     return {
         "id": f"evt_{int(datetime.now(timezone.utc).timestamp() * 1000)}_{random.randbytes(3).hex()}",
+        "catId": input_data.get("catId", "luna"),
         "time": datetime.now(timezone.utc).isoformat(),
         "source": input_data.get("source", "live_capture"),
         "state": input_data.get("state", "Unknown state"),
@@ -168,21 +169,38 @@ def normalize_event(input_data: dict) -> dict:
 def create_scenario_event(scenario_type: str = "live") -> dict:
     scenario = SCENARIO_CATALOG.get(scenario_type, SCENARIO_CATALOG["live"])
     source = "live_capture" if scenario_type == "live" else "demo_scenario"
-    return normalize_event({**scenario, "source": source})
+    cat_id = "luna"
+    if scenario_type == "lowActivity":
+        cat_id = "milo"
+    if scenario_type == "nightYowl":
+        cat_id = "saffron"
+    if scenario_type == "litterConcern":
+        cat_id = "milo"
+    if scenario_type == "appetiteGap":
+        cat_id = "luna"
+    if scenario_type == "grooming":
+        cat_id = "saffron"
+    if scenario_type == "conflict":
+        cat_id = "milo"
+    if scenario_type == "play":
+        cat_id = "milo"
+    return normalize_event({**scenario, "catId": cat_id, "source": source})
 
 
 def create_seed_events() -> list[dict]:
     now = datetime.now(timezone.utc)
     seed = [
-        {"type": "eating", "minutes_ago": 520},
-        {"type": "play", "minutes_ago": 410},
-        {"type": "lowActivity", "minutes_ago": 180},
-        {"type": "nightYowl", "minutes_ago": 45},
-        {"type": "conflict", "minutes_ago": 16},
+        {"type": "eating", "minutes_ago": 520, "cat_id": "luna"},
+        {"type": "play", "minutes_ago": 410, "cat_id": "milo"},
+        {"type": "lowActivity", "minutes_ago": 180, "cat_id": "milo"},
+        {"type": "nightYowl", "minutes_ago": 45, "cat_id": "saffron"},
+        {"type": "conflict", "minutes_ago": 16, "cat_id": "milo"}
     ]
     events = []
     for item in seed:
         event = create_scenario_event(item["type"])
+        if item.get("cat_id"):
+            event["catId"] = item["cat_id"]
         event["time"] = (now - timedelta(minutes=item["minutes_ago"])).isoformat()
         events.append(event)
     return events

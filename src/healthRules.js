@@ -179,7 +179,7 @@ function buildSummary(events, alerts, overall) {
   }
 
   if (overall === "watch") {
-    return "Mochi has behavior changes worth monitoring today. Look at the evidence and watch whether the pattern continues.";
+    return "Your cats have behavior changes worth monitoring today. Review the evidence and watch whether the pattern continues.";
   }
 
   return "Today's observed behavior looks within the normal demo baseline.";

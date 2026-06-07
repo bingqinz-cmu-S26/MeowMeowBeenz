@@ -5,21 +5,34 @@ struct DataView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if app.events.isEmpty {
-                    ContentUnavailableView(
-                        "No events yet",
-                        systemImage: "waveform",
-                        description: Text("Run Analyze or load a demo day from the Upload tab.")
-                    )
-                } else {
-                    Section("Recent meows") {
-                        ForEach(app.events) { event in
-                            EventRow(event: event)
+            ScrollView {
+                VStack(spacing: 14) {
+                    SoftCard(
+                        title: "Recent meows",
+                        subtitle: "\(app.events.count) events loaded",
+                        icon: "waveform.path.ecg",
+                        accent: .purple
+                    ) {
+                        if app.events.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("No events yet", systemImage: "waveform")
+                                    .foregroundStyle(.secondary)
+                                Text("Run Analyze or load a demo day from the Upload tab.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(app.events) { event in
+                                    EventRow(event: event)
+                                }
+                            }
                         }
                     }
                 }
+                .padding(16)
             }
+            .background(AppBackdrop())
             .navigationTitle("Data")
             .refreshable { await app.loadTimelineAndReport() }
         }
@@ -28,26 +41,38 @@ struct DataView: View {
 
 struct EventRow: View {
     let event: TimelineEvent
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let risk = Risk(event.riskLevel)
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(event.state).font(.body.weight(.semibold))
+                Text(event.state)
+                    .font(.body.weight(.semibold))
                 Spacer()
-                if event.riskLevel != "normal" { RiskBadge(level: event.riskLevel) }
+                if event.riskLevel == "normal" {
+                    SoftChip(text: "Low concern", tone: .green)
+                } else {
+                    RiskBadge(level: event.riskLevel)
+                }
             }
             Text(event.summary)
-                .font(.footnote)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
-            HStack(spacing: 6) {
-                Text(Format.humanize(event.intent))
-                Text("·")
-                Text(Format.percent(event.confidence))
-                Text("·")
-                Text(Format.relative(event.time))
+            HStack(spacing: 8) {
+                SoftChip(text: Format.humanize(event.intent), tone: risk.color)
+                SoftChip(text: Format.percent(event.confidence), tone: .blue)
             }
-            .font(.caption)
-            .foregroundStyle(.tertiary)
+            Text(Format.relative(event.time))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !event.suggestion.isEmpty {
+                Divider()
+                Text(event.suggestion)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding(.vertical, 2)
+        .padding(12)
+        .background(Color(.secondarySystemBackground).opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
     }
 }

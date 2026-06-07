@@ -8,33 +8,35 @@ const storageKey = "meowmeowbeenz-events";
 
 const catProfiles = [
   {
-    id: "mochi",
-    name: "Mochi",
-    initials: "Mo",
-    age: "3 yrs",
+    id: "luna",
+    name: "Luna",
+    initials: "Lu",
+    age: "4 yrs",
     breed: "Domestic shorthair",
-    room: "Living room",
-    routine: "Breakfast, couch naps, window watch",
+    room: "Kitchen window",
+    routine: "Breakfast, window watch, evening cuddle time",
+    avatar: "https://placekitten.com/320/320",
     accent: "#66d19e"
   },
   {
-    id: "miso",
-    name: "Miso",
+    id: "milo",
+    name: "Milo",
     initials: "Mi",
-    age: "5 yrs",
+    age: "2 yrs",
     breed: "Tabby mix",
-    room: "Bedroom",
-    routine: "Long sleep blocks, quiet grooming",
+    room: "Living room",
+    routine: "Long sleep blocks and stretch breaks",
     accent: "#e4bd5b"
   },
   {
-    id: "bean",
-    name: "Bean",
-    initials: "Be",
-    age: "1 yr",
-    breed: "Tuxedo",
-    room: "Kitchen",
-    routine: "Play bursts, snack patrol, chirps",
+    id: "saffron",
+    name: "Saffron",
+    initials: "Sa",
+    age: "8 mo",
+    breed: "Maine Coon mix",
+    room: "Bedroom",
+    routine: "Play bursts, snack patrol, quick naps",
+    avatar: "https://placekitten.com/321/321",
     accent: "#76c7d8"
   }
 ];
@@ -46,6 +48,7 @@ const state = {
   mediaEnabled: false,
   stream: null,
   uploadedClipUrl: "",
+  selectedClipFile: null,
   clipAnalysis: null,
   events: loadEvents(),
   chat: [
@@ -63,7 +66,12 @@ const elements = {
   previewVideo: document.querySelector("#previewVideo"),
   videoFallback: document.querySelector("#videoFallback"),
   enableMedia: document.querySelector("#enableMedia"),
-  clipUpload: document.querySelector("#clipUpload"),
+  uploadMenu: document.querySelector("#uploadMenu"),
+  uploadOptions: document.querySelector("#uploadOptions"),
+  takeVideoButton: document.querySelector("#takeVideoButton"),
+  uploadVideoButton: document.querySelector("#uploadVideoButton"),
+  takeVideoUpload: document.querySelector("#takeVideoUpload"),
+  uploadVideoUpload: document.querySelector("#uploadVideoUpload"),
   connectLiveKit: document.querySelector("#connectLiveKit"),
   analyzeNow: document.querySelector("#analyzeNow"),
   mediaStatus: document.querySelector("#mediaStatus"),
@@ -98,6 +106,7 @@ const elements = {
   reportDate: document.querySelector("#reportDate"),
   overallBadge: document.querySelector("#overallBadge"),
   reportSummary: document.querySelector("#reportSummary"),
+  catReports: document.querySelector("#catReports"),
   metricGrid: document.querySelector("#metricGrid"),
   alertsList: document.querySelector("#alertsList"),
   rangeButtons: document.querySelectorAll(".range-button")
@@ -111,7 +120,36 @@ function bindEvents() {
   elements.tabs.forEach((button) => button.addEventListener("click", () => switchTab(button.dataset.tab)));
   elements.homeActions.forEach((card) => card.addEventListener("click", () => switchTab(card.dataset.goTab)));
   elements.enableMedia.addEventListener("click", startMediaPreview);
-  elements.clipUpload.addEventListener("change", handleClipUpload);
+  elements.uploadMenu.addEventListener("click", () => {
+    elements.uploadOptions.hidden = !elements.uploadOptions.hidden;
+  });
+  elements.takeVideoButton.addEventListener("click", () => {
+    elements.uploadOptions.hidden = true;
+    elements.takeVideoUpload.value = "";
+    elements.takeVideoUpload.click();
+  });
+  elements.uploadVideoButton.addEventListener("click", () => {
+    elements.uploadOptions.hidden = true;
+    elements.uploadVideoUpload.value = "";
+    elements.uploadVideoUpload.click();
+  });
+  elements.takeVideoUpload.addEventListener("change", (event) => {
+    handleClipUpload(event.target.files?.[0]);
+  });
+  elements.uploadVideoUpload.addEventListener("change", (event) => {
+    handleClipUpload(event.target.files?.[0]);
+  });
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (
+      !elements.uploadOptions?.hidden &&
+      target &&
+      !elements.uploadOptions.contains(target) &&
+      !elements.uploadMenu.contains(target)
+    ) {
+      elements.uploadOptions.hidden = true;
+    }
+  });
   elements.connectLiveKit.addEventListener("click", handleLiveKitToggle);
   elements.analyzeNow.addEventListener("click", handleAnalyze);
   elements.seedDemo.addEventListener("click", () => {
@@ -162,9 +200,15 @@ async function startMediaPreview() {
   renderMediaState();
 }
 
-function handleClipUpload() {
-  const file = elements.clipUpload.files?.[0];
+function handleClipUpload(file) {
   if (!file) return;
+  if (!file.type.startsWith("video/")) {
+    elements.mediaMessage.textContent = "Please select a video file.";
+    return;
+  }
+
+  state.selectedClipFile = file;
+  elements.mediaMessage.textContent = `${file.name} selected. Analyze clip will send only this file to the model.`;
   state.clipAnalysis = null;
   if (state.uploadedClipUrl) {
     URL.revokeObjectURL(state.uploadedClipUrl);
@@ -180,7 +224,6 @@ function handleClipUpload() {
     elements.previewVideo.removeAttribute("src");
     elements.previewVideo.controls = false;
   }
-  elements.mediaMessage.textContent = `${file.name} selected. Analyze clip will send only this file to the model.`;
   renderMediaState();
   renderCurrentStatus();
 }
@@ -214,9 +257,9 @@ async function handleLiveKitToggle() {
 }
 
 async function handleAnalyze() {
-  const file = elements.clipUpload.files?.[0];
+  const file = state.selectedClipFile;
   if (!file) {
-    elements.mediaMessage.textContent = "Upload a clip first. LiveKit timeline analysis will come later.";
+    elements.mediaMessage.textContent = "Upload a video first. LiveKit timeline analysis will come later.";
     return;
   }
 
@@ -266,7 +309,8 @@ async function handleAsk(question) {
 }
 
 function addEvent(event) {
-  state.events = [...state.events, event].slice(-80);
+  const normalized = normalizeEventCat(event);
+  state.events = [...state.events, normalized].slice(-80);
   saveEvents();
   render();
 }
@@ -289,19 +333,20 @@ function renderTabs() {
 
 function renderHome() {
   const report = buildDailyReport(state.events);
-  const cats = buildCatHomeState(report);
-  const householdStatus = getHouseholdStatus(cats);
+  const catStates = buildCatHomeState();
+  const reportTotalEvents = catStates.reduce((total, cat) => total + cat.report.totalEvents, 0);
+  const householdStatus = getHouseholdStatus(catStates);
   const greeting = buildGreeting();
   elements.homeGreetingLabel.textContent = greeting.label;
   elements.homeGreeting.textContent = greeting.text;
   elements.homeOverallBadge.textContent = householdStatus;
   setRiskClass(elements.homeOverallBadge, riskFromCatStatus(householdStatus));
-  elements.homeCatCount.textContent = `${cats.length} cats`;
-  elements.homeSummary.textContent = buildHomeBrief(report, cats);
-  elements.homeInsight.innerHTML = renderInsight(report, cats);
-  elements.homeMetricGrid.innerHTML = renderHomeStats(report, cats, householdStatus);
-  elements.homePreview.innerHTML = renderCatPreview(cats);
-  elements.catRoster.innerHTML = renderCatRoster(cats);
+  elements.homeCatCount.textContent = `${catStates.length} cats`;
+  elements.homeSummary.textContent = buildHomeBrief(catStates, reportTotalEvents);
+  elements.homeInsight.innerHTML = renderInsight(catStates);
+  elements.homeMetricGrid.innerHTML = renderHomeStats(report, catStates, householdStatus);
+  elements.homePreview.innerHTML = renderCatPreview(catStates);
+  elements.catRoster.innerHTML = renderCatRoster(catStates);
 }
 
 function buildGreeting() {
@@ -311,71 +356,69 @@ function buildGreeting() {
   return { label: "Good evening", text: "Good evening, BingQ." };
 }
 
-function buildHomeBrief(report, cats) {
+function buildHomeBrief(cats, totalEvents) {
   const alertCount = cats.filter((cat) => cat.status === "alert").length;
   const watchCount = cats.filter((cat) => cat.status === "watch").length;
-  if (report.totalEvents === 0) return `${cats.length} cats are set up. Add live observations or load the demo day to turn this into a real household check-in.`;
-  if (alertCount > 0) return `${cats.length} cats checked in. One cat needs attention from today's behavior signals; the rest are kept in watch or normal status.`;
-  if (watchCount > 0) return `${cats.length} cats checked in. One routine is worth watching, but there is not enough signal to call it a health issue.`;
-  return `${cats.length} cats checked in. The household looks steady, with routines close to the recorded baseline.`;
+  if (totalEvents === 0) return `${cats.length} cats are set up. Add live observations or load the demo day to build household baseline.`;
+  if (alertCount > 0) return `${cats.length} cats checked in. ${alertCount} cat(s) need attention from today's behavior signals.`;
+  if (watchCount > 0) return `${cats.length} cats checked in. One or more routines are worth watching, but no immediate health issue is flagged.`;
+  return `${cats.length} cats checked in. The household looks steady, with routines close to the current baseline.`;
 }
 
-function renderInsight(report, cats) {
-  const alert = report.alerts[0];
-  if (alert) {
-    return `<strong>${escapeHtml(alert.title)}</strong><span>${escapeHtml(alert.evidence[0])}</span>`;
+function renderInsight(catStates) {
+  const firstAlertCat = catStates.find((cat) => cat.status === "alert");
+  if (firstAlertCat) {
+    const catAlert = firstAlertCat.report.alerts[0];
+    if (catAlert) return `<strong>${escapeHtml(firstAlertCat.name)} needs attention</strong><span>${escapeHtml(catAlert.evidence[0])}</span>`;
   }
-  if (report.totalEvents > 0) {
-    const best = cats.find((cat) => cat.status === "perfect") || cats[0];
-    return `<strong>${escapeHtml(best.name)} looks ${escapeHtml(best.status)}</strong><span>Rest, food, activity, and vocalization signals will become stronger as the timeline grows.</span>`;
+  if (catStates.some((cat) => cat.report.totalEvents > 0)) {
+    const steady = catStates.find((cat) => cat.status === "perfect") || catStates[0];
+    return `<strong>${escapeHtml(steady.name)} looks ${escapeHtml(steady.status)}</strong><span>Rest, food, activity, and vocal signals become stronger as each cat timeline grows.</span>`;
   }
-  return `<strong>Build each cat's baseline</strong><span>MeowMeowBeenz works best after a few normal eating, activity, litter, vocal, and sleep observations.</span>`;
+  return `<strong>Build each cat's baseline</strong><span>MeowMeowBeenz works best after a few normal eating, activity, litter, vocal, and rest observations.</span>`;
 }
 
-function buildCatHomeState(report) {
-  const statuses = deriveCatStatuses(report);
-  return catProfiles.map((cat, index) => ({
-    ...cat,
-    status: statuses[index],
-    lastSeen: getCatLastSeen(cat, index, report),
-    note: getCatStatusNote(cat, statuses[index], report),
-    vitals: getCatVitals(cat, index, report)
-  }));
+function buildCatHomeState() {
+  return catProfiles.map((cat) => {
+    const report = buildRangeReport(getCatEvents(cat.id), "day");
+    return {
+      ...cat,
+      report,
+      status: deriveCatStatus(report),
+      lastSeen: getCatLastSeen(cat.id),
+      note: getCatStatusNote(report),
+      vitals: getCatVitals(report)
+    };
+  });
 }
 
-function deriveCatStatuses(report) {
-  const mochi = report.overall === "review" ? "alert" : report.overall === "watch" ? "watch" : report.totalEvents > 0 ? "perfect" : "nice";
-  const miso = report.counts.resting >= 3 && report.counts.vocal <= 1 ? "perfect" : report.counts.active === 0 && report.totalEvents > 2 ? "watch" : "nice";
-  const bean = report.counts.vocal >= 3 || report.counts.review > 0 ? "alert" : report.counts.active >= 2 ? "perfect" : "nice";
-  return keepOneAlert([mochi, miso, bean]);
+function deriveCatStatus(report) {
+  if (report.totalEvents === 0) return "nice";
+  if (report.overall === "review") return "alert";
+  if (report.overall === "watch") return "watch";
+  return "perfect";
 }
 
-function keepOneAlert(statuses) {
-  const firstAlertIndex = statuses.findIndex((status) => status === "alert");
-  if (firstAlertIndex === -1) return statuses;
-  return statuses.map((status, index) => (status === "alert" && index !== firstAlertIndex ? "watch" : status));
+function getCatEvents(catId) {
+  const normalized = state.events.map((event, index) => normalizeEventCat(event, index));
+  return normalized.filter((event) => event.catId === catId).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 }
 
-function getCatLastSeen(cat, index, report) {
-  const latest = state.events[state.events.length - 1];
-  if (index === 0 && latest) return `${formatTime(latest.time)} · ${formatToken(latest.behaviorLabel)}`;
-  if (cat.id === "miso" && report.counts.resting > 0) return "Last rest block logged today";
-  if (cat.id === "bean" && report.counts.active > 0) return "Active burst logged today";
-  return cat.room;
+function getCatLastSeen(catId) {
+  const latest = getCatEvents(catId)[0];
+  if (latest) return `${formatTime(latest.time)} · ${formatToken(latest.behaviorLabel)}`;
+  return "No timeline events yet.";
 }
 
-function getCatStatusNote(cat, status, report) {
-  if (status === "alert") return "Needs a closer look. Compare this with appetite, litter, and vocal patterns.";
-  if (status === "watch") return "A routine changed enough to watch, but the signal is still early.";
-  if (status === "perfect") return "Routine is matching the calm baseline in today's timeline.";
+function getCatStatusNote(report) {
   if (report.totalEvents === 0) return "Profile ready. Waiting for live or uploaded observations.";
-  return "No clear concern from current household signals.";
+  if (report.overall === "review") return "Needs a closer look. Compare with appetite, litter, and vocal patterns.";
+  if (report.overall === "watch") return "A routine changed enough to watch, but the signal is still early.";
+  return "Routine is matching the calm baseline in today's timeline.";
 }
 
-function getCatVitals(cat, index, report) {
-  if (index === 0) return [["Events", report.totalEvents], ["Alerts", Math.min(report.alerts.length, 1)]];
-  if (cat.id === "miso") return [["Rest", report.counts.resting], ["Groom", report.counts.grooming || 0]];
-  return [["Active", report.counts.active], ["Vocal", report.counts.vocal]];
+function getCatVitals(report) {
+  return [["Events", report.totalEvents], ["Alerts", Math.min(report.alerts.length, 1)]];
 }
 
 function getHouseholdStatus(cats) {
@@ -398,6 +441,37 @@ function renderHomeStats(report, cats, householdStatus) {
     ["Events", report.totalEvents],
     ["Warnings", Math.min(report.alerts.length, 1)]
   ].map(([label, value]) => `<div class="home-stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+}
+
+function getCatEventBuckets(events) {
+  const normalized = Array.isArray(events) ? events.map((event, index) => normalizeEventCat(event, index)) : [];
+  return catProfiles.map((cat) => ({
+    cat,
+    events: normalized.filter((event) => event.catId === cat.id)
+  }));
+}
+
+function renderActivityGroups(catBuckets) {
+  if (!catBuckets.length) {
+    return `<div class="empty-state"><h3>No cats to show</h3><p>Load a timeline to see per-cat events.</p></div>`;
+  }
+
+  return catBuckets.map(({ cat, events }) => {
+    const sortedEvents = [...events].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+    const copy = sortedEvents.length === 0 ? "No events match this filter yet." : "No timeline events yet.";
+    return `
+      <section class="cat-activity-group">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Timeline</p>
+            <h2>${escapeHtml(cat.name)}</h2>
+          </div>
+          <span class="status-pill">${sortedEvents.length} events</span>
+        </div>
+        <div class="cat-activity-events">${renderEventCards(sortedEvents, copy, cat)}</div>
+      </section>
+    `;
+  }).join("");
 }
 
 function renderCatPreview(cats) {
@@ -433,6 +507,9 @@ function renderCatRoster(cats) {
 }
 
 function renderCatAvatar(cat) {
+  if (cat.avatar) {
+    return `<div class="cat-avatar" style="--cat-accent:${escapeHtml(cat.accent)}"><img src="${escapeHtml(cat.avatar)}" alt="${escapeHtml(cat.name)} profile photo" onerror="this.parentElement.classList.add('no-avatar'); this.remove()" /><span>${escapeHtml(cat.initials)}</span></div>`;
+  }
   return `<div class="cat-avatar" style="--cat-accent:${escapeHtml(cat.accent)}"><span>${escapeHtml(cat.initials)}</span></div>`;
 }
 
@@ -441,13 +518,13 @@ function renderCatStatus(status) {
 }
 
 function renderMediaState() {
-  const file = elements.clipUpload.files?.[0];
+  const file = state.selectedClipFile;
   const hasVideoClip = Boolean(file?.type.startsWith("video/"));
   elements.mediaStatus.textContent = file ? "Clip ready" : state.mediaEnabled ? "Media on" : "Media off";
   elements.mediaStatus.classList.toggle("active", state.mediaEnabled || Boolean(file));
   elements.videoFallback.classList.toggle("hidden", state.mediaEnabled || hasVideoClip);
   if (!state.mediaEnabled && !hasVideoClip) {
-    elements.videoFallback.querySelector("p").textContent = file ? "Audio clip selected" : "Camera preview appears here";
+    elements.videoFallback.querySelector("p").textContent = file ? "Video selected" : "Camera preview appears here";
   }
 }
 
@@ -469,7 +546,7 @@ function renderCurrentStatus() {
   if (!latest) {
     elements.riskBadge.textContent = "Baseline";
     setRiskClass(elements.riskBadge, "normal");
-    elements.currentStatus.innerHTML = `<div class="empty-state"><h3>No clip analysis yet</h3><p>Upload a video or audio clip, then run Analyze clip to see the model response here.</p></div>`;
+    elements.currentStatus.innerHTML = `<div class="empty-state"><h3>No clip analysis yet</h3><p>Upload a video, then run Analyze clip to see the model response here.</p></div>`;
     return;
   }
   elements.riskBadge.textContent = labelForRisk(latest.riskLevel);
@@ -519,12 +596,14 @@ function renderActivity() {
   const report = buildDailyReport(state.events);
   const watch = buildWatchMetrics(report);
   elements.filterButtons.forEach((button) => button.classList.toggle("active", button.dataset.filter === state.activityFilter));
-  elements.activityCount.textContent = `${events.length} events`;
+  const catBuckets = getCatEventBuckets(events);
+  const totalCatsWithEvents = catBuckets.filter((bucket) => bucket.events.length > 0).length;
+  elements.activityCount.textContent = `${events.length} events · ${totalCatsWithEvents} cats`;
   elements.activitySummary.textContent = buildActivitySummary(report, watch);
   elements.activityRings.innerHTML = renderActivityRings(watch);
   elements.activityMetrics.innerHTML = renderWatchMetricCards(watch);
   elements.activityBars.innerHTML = renderActivityBars(report.counts);
-  elements.activityList.innerHTML = renderEventCards(events, "No events match this filter yet.");
+  elements.activityList.innerHTML = renderActivityGroups(catBuckets);
 }
 
 function buildWatchMetrics(report) {
@@ -582,12 +661,21 @@ function renderActivityBars(counts) {
 
 function renderHealth() {
   const report = buildRangeReport(state.events, state.reportRange);
+  const catReports = catProfiles.map((cat) => ({
+    ...cat,
+    report: buildRangeReport(getCatEvents(cat.id), state.reportRange)
+  }));
   elements.rangeButtons.forEach((button) => button.classList.toggle("active", button.dataset.range === state.reportRange));
   elements.reportDate.textContent = report.dateLabel;
   elements.overallBadge.textContent = labelForRisk(report.overall);
   setRiskClass(elements.overallBadge, report.overall);
   elements.reportSummary.textContent = report.summary;
   elements.metricGrid.innerHTML = renderMetrics([["Events", report.totalEvents], ["Eating", report.counts.eating], ["Litter", report.counts.litter], ["Active", report.counts.active], ["Resting", report.counts.resting], ["Vocal", report.counts.vocal]]);
+  if (catReports.length) {
+    elements.catReports.innerHTML = renderCatReports(catReports);
+  } else {
+    elements.catReports.innerHTML = `<div class="empty-state"><h3>No cat reports yet</h3><p>Load the demo day or add live events to create per-cat reports.</p></div>`;
+  }
   if (report.alerts.length === 0) {
     elements.alertsList.innerHTML = `<div class="empty-state"><h3>No warnings yet</h3><p>The assistant is building a behavior baseline. This is not a medical diagnosis.</p></div>`;
     return;
@@ -597,14 +685,34 @@ function renderHealth() {
   `).join("");
 }
 
+function renderCatReports(catReports) {
+  return catReports.map((catReport) => {
+    const { name, report, accent, avatar, initials, id } = catReport;
+    return `
+    <article class="cat-report-card" style="--cat-accent:${escapeHtml(accent)}">
+      <div class="cat-report-head">
+        ${renderCatAvatar({ id, name, initials, accent, avatar })}
+        <div>
+          <p class="eyebrow">Cat report</p>
+          <h3>${escapeHtml(name)} · ${escapeHtml(report.dateLabel)}</h3>
+        </div>
+        <span class="risk-badge ${escapeHtml(report.overall === "review" ? "review" : report.overall === "watch" ? "watch" : "normal")}">${labelForRisk(report.overall)}</span>
+      </div>
+      <p>${escapeHtml(report.summary)}</p>
+      <div class="cat-report-metrics">${renderMetrics([["Events", report.totalEvents], ["Eating", report.counts.eating], ["Litter", report.counts.litter], ["Active", report.counts.active], ["Resting", report.counts.resting], ["Vocal", report.counts.vocal]])}</div>
+      ${report.alerts.length === 0 ? `<p class="cat-report-empty">No warnings for this cat.</p>` : `<ul class="cat-report-alerts">${report.alerts.map((alert) => `<li><strong>${escapeHtml(alert.title)}</strong> — ${escapeHtml(alert.evidence[0])}</li>`).join("")}</ul>`}
+    </article>
+  `;}).join("");
+}
+
 function renderMetrics(metrics) {
   return metrics.map(([label, value]) => `<div class="metric"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`).join("");
 }
 
-function renderEventCards(events, emptyCopy) {
+function renderEventCards(events, emptyCopy, cat = null) {
   if (events.length === 0) return `<div class="empty-state"><h3>No timeline events</h3><p>${escapeHtml(emptyCopy)}</p></div>`;
-  return [...events].reverse().map((event) => `
-    <article class="timeline-item"><div class="timeline-meta"><span>${formatTime(event.time)}</span><span class="risk-dot ${escapeHtml(event.riskLevel)}"></span></div><h3>${escapeHtml(event.state)}</h3><p>${escapeHtml(event.summary)}</p><div class="timeline-foot"><span>${escapeHtml(formatToken(event.behaviorLabel))}</span><span>${Math.round(event.confidence * 100)}%</span></div></article>
+  return [...events].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).map((event) => `
+    <article class="timeline-item"><div class="timeline-meta"><span>${formatTime(event.time)}</span><span class="risk-dot ${escapeHtml(event.riskLevel)}"></span></div>${cat ? `<div class="timeline-cat">Tagged: ${escapeHtml(cat.name)}</div>` : ""}<h3>${escapeHtml(event.state)}</h3><p>${escapeHtml(event.summary)}</p><div class="timeline-foot"><span>${escapeHtml(formatToken(event.behaviorLabel))}</span><span>${Math.round(event.confidence * 100)}%</span></div></article>
   `).join("");
 }
 
@@ -658,8 +766,9 @@ function escapeHtml(value) {
 function loadEvents() {
   try {
     const current = JSON.parse(localStorage.getItem(storageKey));
-    if (current) return current;
-    return JSON.parse(localStorage.getItem("mochi-monitor-events")) || [];
+    if (current) return (Array.isArray(current) ? current : []).map((event, index) => normalizeEventCat(event, index));
+    const legacy = JSON.parse(localStorage.getItem("mochi-monitor-events"));
+    return Array.isArray(legacy) ? legacy.map((event, index) => normalizeEventCat(event, index)) : [];
   } catch {
     return [];
   }
@@ -667,4 +776,33 @@ function loadEvents() {
 
 function saveEvents() {
   localStorage.setItem(storageKey, JSON.stringify(state.events));
+}
+
+function normalizeEventCat(event, fallbackIndex = 0) {
+  if (!event || typeof event !== "object") {
+    return {
+      catId: catProfiles[0]?.id || "luna",
+      time: new Date().toISOString()
+    };
+  }
+
+  if (isKnownCatId(event.catId)) return { ...event, catId: String(event.catId).trim().toLowerCase() };
+  return {
+    ...event,
+    catId: pickFallbackCatId(event, fallbackIndex)
+  };
+}
+
+function isKnownCatId(id) {
+  if (typeof id !== "string") return false;
+  return catProfiles.some((cat) => cat.id === id.trim().toLowerCase());
+}
+
+function pickFallbackCatId(event, fallbackIndex = 0) {
+  const key = `${fallbackIndex}-${event.id || ""}-${event.time || ""}-${event.state || ""}`;
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return catProfiles[hash % catProfiles.length].id;
 }

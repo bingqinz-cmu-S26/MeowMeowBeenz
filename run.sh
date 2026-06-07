@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
 BACKEND_PID=""
+VOICE_PID=""
 
 cleanup() {
   if [[ -n "$BACKEND_PID" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
@@ -12,6 +13,11 @@ cleanup() {
     echo "Stopping backend (PID $BACKEND_PID)..."
     kill "$BACKEND_PID" 2>/dev/null || true
     wait "$BACKEND_PID" 2>/dev/null || true
+  fi
+  if [[ -n "$VOICE_PID" ]] && kill -0 "$VOICE_PID" 2>/dev/null; then
+    echo "Stopping voice worker (PID $VOICE_PID)..."
+    kill "$VOICE_PID" 2>/dev/null || true
+    wait "$VOICE_PID" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT INT TERM
@@ -31,19 +37,14 @@ fi
 echo "==> Installing backend dependencies..."
 backend/.venv/bin/pip install -q -r backend/requirements.txt
 
-if [[ ! -d mobile/node_modules ]]; then
-  echo "==> Installing mobile dependencies..."
-  (cd mobile && npm install)
-fi
-
 LOCAL_IP="$(ipconfig getifaddr en0 2>/dev/null || true)"
 if [[ -z "$LOCAL_IP" ]]; then
   LOCAL_IP="$(ipconfig getifaddr en1 2>/dev/null || true)"
 fi
 if [[ -n "$LOCAL_IP" ]]; then
-  export EXPO_PUBLIC_API_URL="${EXPO_PUBLIC_API_URL:-http://${LOCAL_IP}:8000}"
+  API_URL="${API_URL:-http://${LOCAL_IP}:8000}"
 else
-  export EXPO_PUBLIC_API_URL="${EXPO_PUBLIC_API_URL:-http://localhost:8000}"
+  API_URL="${API_URL:-http://localhost:8000}"
 fi
 
 if lsof -ti :8000 >/dev/null 2>&1; then
@@ -75,9 +76,20 @@ if ! curl -sf http://localhost:8000/api/health >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "==> Mobile API URL: $EXPO_PUBLIC_API_URL"
-echo "==> Starting Expo (Ctrl+C stops everything)"
+echo "==> API URL: $API_URL"
+echo "==> Backend is running on http://localhost:8000 (Ctrl+C stops it)"
 echo ""
 
-cd mobile
-exec npm start
+if [[ "${START_VOICE_WORKER:-0}" == "1" || "${START_VOICE_WORKER:-false}" == "true" ]]; then
+  echo "==> Installing voice requirements (backend/requirements-voice.txt)..."
+  backend/.venv/bin/pip install -q -r backend/requirements-voice.txt
+
+  echo "==> Starting voice worker..."
+  (
+    cd backend
+    exec .venv/bin/python voice_agent.py start
+  ) &
+  VOICE_PID=$!
+fi
+
+wait

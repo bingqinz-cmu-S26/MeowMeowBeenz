@@ -1,7 +1,8 @@
 """Hands-free voice agent for MeowMeowBeenz (LiveKit Agents worker).
 
-Pipeline: Deepgram STT  ->  MiniMax M2 LLM (with moss retrieval as a tool)  ->  MiniMax Speech-02 TTS.
-The LLM stays MiniMax; only the "ears" (STT) are borrowed, since MiniMax has no public ASR.
+Pipeline: AssemblyAI STT (via LiveKit Inference)  ->  MiniMax M2 LLM (with moss retrieval as a tool)  ->  MiniMax Speech-02 TTS.
+The LLM stays MiniMax; only the "ears" (STT) are borrowed. STT goes through LiveKit
+Inference, so it's billed on your LiveKit key with no separate STT account.
 
 This is a SEPARATE process from the FastAPI server (app.main). It connects to a LiveKit
 room as an agent participant and talks to whoever joins (the mobile app).
@@ -13,14 +14,16 @@ Run it (from the backend/ directory, after installing requirements-voice.txt):
 
 Required env (see ../.env.example):
     MINIMAX_API_KEY, MINIMAX_MODEL, MINIMAX_API_URL   (brain + voice)
-    DEEPGRAM_API_KEY                                  (speech-to-text)
-    LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET  (room connection)
+    LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET  (room connection + Inference STT)
+
+STT uses LiveKit Inference (AssemblyAI), authenticated by your LiveKit credentials —
+no separate Deepgram/AssemblyAI account. Requires LiveKit Cloud (Inference is not on self-hosted).
 """
 
 import logging
 
-from livekit.agents import Agent, AgentSession, JobContext, RunContext, WorkerOptions, cli, function_tool
-from livekit.plugins import deepgram, minimax, openai, silero
+from livekit.agents import Agent, AgentSession, JobContext, RunContext, WorkerOptions, cli, function_tool, inference
+from livekit.plugins import minimax, openai, silero
 
 from app.config import settings
 from app.services.agent import friendly_time
@@ -69,10 +72,10 @@ class CatWellnessAgent(Agent):
             question: The owner's question, e.g. "what was Mochi doing last night".
             cat: Optional cat name to focus on (e.g. Mochi, Luna, Tofu, Biscuit).
         """
-        now = reference_now()
-        events = retrieve_events(question, cat=cat, limit=6)
+        events = await retrieve_events(question, cat=cat, limit=6)
         if not events:
             return {"observations": [], "note": "No matching observations found."}
+        now = reference_now(events)
         return {
             "observations": [
                 {
@@ -92,7 +95,7 @@ async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
 
     session = AgentSession(
-        stt=deepgram.STT(model="nova-3"),
+        stt=inference.STT(model="assemblyai/universal-streaming", language="en"),
         llm=openai.LLM(
             model=settings.minimax_model,
             base_url=_minimax_base_url(),

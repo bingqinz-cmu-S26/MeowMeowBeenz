@@ -71,6 +71,14 @@ struct ScenarioType: Codable, Identifiable, Hashable {
     let label: String
 }
 
+struct LiveKitToken: Codable, Sendable {
+    let configured: Bool
+    let url: String
+    let room: String
+    let identity: String
+    let token: String
+}
+
 // MARK: - Local UI models
 
 enum ReportRange: String, CaseIterable, Identifiable {
@@ -104,3 +112,12 @@ struct EventsResponse: Codable { let ok: Bool; let events: [TimelineEvent]; let 
 struct ReportResponse: Codable { let ok: Bool; let report: HealthReport }
 struct AgentResponse: Codable { let ok: Bool; let answer: String; let provider: String }
 struct ScenariosResponse: Codable { let ok: Bool; let scenarios: [ScenarioType] }
+struct ClipFileInfo: Codable { let name: String; let type: String; let size: Int? = nil }
+struct ClipAnalysisResponse: Codable {
+    let ok: Bool
+    let provider: String
+    let text: String
+    let file: ClipFileInfo?
+    let event: TimelineEvent?
+    let analysis: TimelineEvent?
+}

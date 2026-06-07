@@ -10,49 +10,110 @@ struct ReportsView: View {
         )
     }
 
+    private let countGrid = [
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10)
+    ]
+
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Picker("Range", selection: rangeBinding) {
-                        ForEach(ReportRange.allCases) { range in
-                            Text(range.label).tag(range)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                if let report = app.report {
-                    Section("Summary") {
-                        LabeledContent("Overall") { RiskBadge(level: report.overall) }
-                        LabeledContent("Window", value: report.dateLabel)
-                        Text(report.summary).foregroundStyle(.secondary)
-                    }
-
-                    Section("Signals") {
-                        if report.alerts.isEmpty {
-                            Label("No distress signals detected", systemImage: "checkmark.seal")
-                                .foregroundStyle(.green)
-                        } else {
-                            ForEach(report.alerts) { alert in
-                                AlertRow(alert: alert)
+            ScrollView {
+                VStack(spacing: 14) {
+                    SoftCard(
+                        title: "Range",
+                        subtitle: "Select a reporting window",
+                        icon: "calendar",
+                        accent: .indigo
+                    ) {
+                        Picker("Range", selection: rangeBinding) {
+                            ForEach(ReportRange.allCases) { range in
+                                Text(range.label).tag(range)
                             }
                         }
+                        .pickerStyle(.segmented)
                     }
 
-                    Section("Counts") {
-                        CountRow(label: "Eating", value: report.counts.eating)
-                        CountRow(label: "Litter", value: report.counts.litter)
-                        CountRow(label: "Active", value: report.counts.active)
-                        CountRow(label: "Resting", value: report.counts.resting)
-                        CountRow(label: "Grooming", value: report.counts.grooming)
-                        CountRow(label: "Vocal", value: report.counts.vocal)
+                    if let report = app.report {
+                        SoftCard(
+                            title: "Summary",
+                            subtitle: report.dateLabel,
+                            icon: "chart.bar.doc.horizontal",
+                            accent: .mint
+                        ) {
+                            HStack {
+                                Text("Overall")
+                                Spacer()
+                                RiskBadge(level: report.overall)
+                            }
+                            .font(.body.weight(.semibold))
+
+                            Text(report.summary)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        SoftCard(
+                            title: "Signals",
+                            subtitle: "\(report.alerts.count) issue\(report.alerts.count == 1 ? "" : "s")",
+                            icon: "bell.badge",
+                            accent: .orange
+                        ) {
+                            if report.alerts.isEmpty {
+                                HStack(spacing: 6) {
+                                    Label("No distress signals detected", systemImage: "checkmark.seal.fill")
+                                        .foregroundStyle(.green)
+                                    Spacer()
+                                }
+                            } else {
+                                VStack(spacing: 10) {
+                                    ForEach(report.alerts) { alert in
+                                        AlertRow(alert: alert)
+                                    }
+                                }
+                            }
+                        }
+
+                        SoftCard(
+                            title: "Activity counts",
+                            subtitle: "Last \(report.range) window",
+                            icon: "chart.pie",
+                            accent: .blue
+                        ) {
+                            let countItems: [(String, Int, Color)] = [
+                                ("Eating", report.counts.eating, .orange),
+                                ("Litter", report.counts.litter, .brown),
+                                ("Active", report.counts.active, .green),
+                                ("Resting", report.counts.resting, .gray),
+                                ("Grooming", report.counts.grooming, .teal),
+                                ("Vocal", report.counts.vocal, .purple)
+                            ]
+
+                            LazyVGrid(columns: countGrid, spacing: 10) {
+                                ForEach(countItems, id: \.0) { item in
+                                    CountTile(
+                                        label: item.0,
+                                        value: item.1,
+                                        tone: item.2
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        SoftCard(
+                            title: "No report",
+                            subtitle: "Pull to refresh once backend is reachable",
+                            icon: "doc.text",
+                            accent: .blue
+                        ) {
+                            Text("Refresh or switch range after the backend is running.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                } else {
-                    ContentUnavailableView("No report", systemImage: "doc.text",
-                                           description: Text("Pull to refresh once the backend is running."))
                 }
+                .padding(16)
             }
+            .background(AppBackdrop())
             .navigationTitle("Reports")
             .refreshable { await app.changeRange(app.reportRange) }
         }
@@ -61,24 +122,47 @@ struct ReportsView: View {
 
 private struct AlertRow: View {
     let alert: Alert
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(alert.title).font(.body.weight(.semibold))
                 Spacer()
                 RiskBadge(level: alert.level)
             }
             if let evidence = alert.evidence.first {
-                Text(evidence).font(.footnote).foregroundStyle(.secondary)
+                Text(evidence)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-            Text(alert.suggestion).font(.caption).foregroundStyle(.tertiary)
+            Text(alert.suggestion)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Text("Confidence \(Format.percent(alert.confidence))")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 2)
+        .padding(12)
+        .background(Color(.secondarySystemBackground).opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
-private struct CountRow: View {
+private struct CountTile: View {
     let label: String
     let value: Int
-    var body: some View { LabeledContent(label, value: "\(value)") }
+    let tone: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(value)")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(tone)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(tone.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+    }
 }

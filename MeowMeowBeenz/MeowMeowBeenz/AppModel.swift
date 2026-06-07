@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 import Observation
 
 /// Central observable app state. All UI reads from here; networking goes through APIClient.
@@ -153,6 +154,41 @@ final class AppModel {
                                     text: "I couldn't reach the assistant. Check that the backend is running.",
                                     provider: "error"))
         }
+    }
+
+    // MARK: Voice
+
+    func livekitToken() async throws -> LiveKitToken {
+        try await client.livekitToken()
+    }
+
+    // MARK: Clip upload
+
+    func analyzeUploadedVideo(fileData: Data, filename: String, mimeType: String) async -> ClipAnalysisResponse? {
+        do {
+            let result = try await client.analyzeClip(fileData: fileData, filename: filename, mimeType: mimeType)
+            guard result.ok else {
+                errorMessage = result.text
+                return nil
+            }
+            if let event = result.event ?? result.analysis {
+                events.insert(event, at: 0)
+                report = try? await client.report(range: reportRange)
+            }
+            errorMessage = nil
+            return result
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func mimeType(for url: URL) -> String {
+        let ext = url.pathExtension.lowercased()
+        guard let type = UTType(filenameExtension: ext) else {
+            return "video/mp4"
+        }
+        return type.preferredMIMEType ?? "video/\(ext)"
     }
 
     // MARK: Derived

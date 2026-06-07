@@ -108,3 +108,18 @@ class AuthUser(BaseModel):
     username: str
     displayName: str
     createdAt: str | None = None
+
+
+class ClipFileInfo(BaseModel):
+    name: str
+    type: str
+    size: int
+
+
+class ClipAnalysisResponse(BaseModel):
+    ok: bool
+    provider: str
+    text: str
+    file: ClipFileInfo
+    event: TimelineEvent | None = None
+    analysis: TimelineEvent | None = None

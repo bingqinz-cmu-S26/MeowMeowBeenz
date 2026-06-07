@@ -20,9 +20,13 @@ async def connect_to_mongo() -> bool:
     if not settings.mongodb_uri:
         return False
 
-    _client = AsyncIOMotorClient(settings.mongodb_uri)
-    await _client.admin.command("ping")
-    return True
+    try:
+        _client = AsyncIOMotorClient(settings.mongodb_uri)
+        await _client.admin.command("ping")
+        return True
+    except Exception:
+        _client = None
+        return False
 
 
 async def close_mongo_connection() -> None:

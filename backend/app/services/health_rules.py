@@ -198,5 +198,5 @@ def build_summary(events: list[dict], alerts: list[dict], overall: str) -> str:
     if overall == "review":
         return "Some signals disagree or need human review. This is not a diagnosis, but it is worth checking the recent clips."
     if overall == "watch":
-        return "Mochi has behavior changes worth monitoring today. Look at the evidence and watch whether the pattern continues."
+        return "Your cats have behavior changes worth monitoring today. Review the evidence and watch whether the pattern continues."
     return "Today's observed behavior looks within the normal demo baseline."

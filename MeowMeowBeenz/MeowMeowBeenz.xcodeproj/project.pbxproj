@@ -19,6 +19,9 @@
 		AA000000000000000000B008 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F008 /* ChatView.swift */; };
 		AA000000000000000000B009 /* UploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F009 /* UploadView.swift */; };
 		AA000000000000000000B010 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F010 /* AccountView.swift */; };
+		AA000000000000000000B011 /* VoiceChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F011 /* VoiceChatModel.swift */; };
+		AA000000000000000000B012 /* VoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F012 /* VoiceView.swift */; };
+		AA000000000000000000B100 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000D001 /* LiveKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +38,8 @@
 		AA000000000000000000F008 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		AA000000000000000000F009 /* UploadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadView.swift; sourceTree = "<group>"; };
 		AA000000000000000000F010 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
+		AA000000000000000000F011 /* VoiceChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceChatModel.swift; sourceTree = "<group>"; };
+		AA000000000000000000F012 /* VoiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,6 +47,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA000000000000000000B100 /* LiveKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,6 +85,8 @@
 				AA000000000000000000F008 /* ChatView.swift */,
 				AA000000000000000000F009 /* UploadView.swift */,
 				AA000000000000000000F010 /* AccountView.swift */,
+				AA000000000000000000F011 /* VoiceChatModel.swift */,
+				AA000000000000000000F012 /* VoiceView.swift */,
 			);
 			path = MeowMeowBeenz;
 			sourceTree = "<group>";
@@ -99,6 +107,9 @@
 			dependencies = (
 			);
 			name = MeowMeowBeenz;
+			packageProductDependencies = (
+				AA000000000000000000D001 /* LiveKit */,
+			);
 			productName = MeowMeowBeenz;
 			productReference = 19A715212C15100100000001 /* MeowMeowBeenz.app */;
 			productType = "com.apple.product-type.application";
@@ -127,6 +138,9 @@
 				Base,
 			);
 			mainGroup = 19A715182C15100100000001;
+			packageReferences = (
+				AA000000000000000000C001 /* XCRemoteSwiftPackageReference "client-sdk-swift" */,
+			);
 			productRefGroup = 19A715222C15100100000001 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -163,6 +177,8 @@
 				AA000000000000000000B008 /* ChatView.swift in Sources */,
 				AA000000000000000000B009 /* UploadView.swift in Sources */,
 				AA000000000000000000B010 /* AccountView.swift in Sources */,
+				AA000000000000000000B011 /* VoiceChatModel.swift in Sources */,
+				AA000000000000000000B012 /* VoiceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -294,6 +310,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = MeowMeowBeenz;
+				INFOPLIST_KEY_NSCameraUsageDescription = "MeowMeowBeenz needs camera access to record a video for clip analysis.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MeowMeowBeenz uses the microphone for hands-free voice chat with the cat wellness assistant.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -326,6 +344,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = MeowMeowBeenz;
+				INFOPLIST_KEY_NSCameraUsageDescription = "MeowMeowBeenz needs camera access to record a video for clip analysis.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MeowMeowBeenz uses the microphone for hands-free voice chat with the cat wellness assistant.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -370,6 +390,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AA000000000000000000C001 /* XCRemoteSwiftPackageReference "client-sdk-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/livekit/client-sdk-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.14.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA000000000000000000D001 /* LiveKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA000000000000000000C001 /* XCRemoteSwiftPackageReference "client-sdk-swift" */;
+			productName = LiveKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 19A715192C15100100000001 /* Project object */;
 }

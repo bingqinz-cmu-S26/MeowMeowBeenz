@@ -135,6 +135,12 @@
     radial-gradient(circle at 50% 64%, rgba(255, 255, 255, 0.12) 0 22%, transparent 24%),
     color-mix(in srgb, var(--cat-accent), #111312 68%);
 }
+.cat-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
 .cat-avatar::before,
 .cat-avatar::after {
   content: "";
@@ -294,6 +300,28 @@
 .upload-button input {
   display: none;
 }
+.upload-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.upload-option-button {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 7px;
+  border: 1px solid rgba(118, 199, 216, 0.38);
+  background: rgba(118, 199, 216, 0.12);
+  color: var(--cyan);
+  font-weight: 800;
+  cursor: pointer;
+}
+.hidden-picker {
+  display: none;
+}
+.upload-option-button:hover,
+.upload-option-button:focus-visible {
+  background: rgba(118, 199, 216, 0.22);
+}
 .range-buttons,
 .activity-filters {
   display: flex;
@@ -346,6 +374,71 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.cat-activity-group {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+}
+
+.cat-activity-events {
+  display: grid;
+  gap: 10px;
+}
+
+.timeline-cat {
+  margin: 2px 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cat-reports {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cat-report-card {
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cat-report-head {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cat-report-card > p {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+
+.cat-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cat-report-metrics .metric {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px;
+}
+
+.cat-report-alerts {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 @media (max-width: 860px) {
   body {
@@ -487,5 +580,9 @@
   .activity-rings,
   .watch-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .activity-list,
+  .cat-reports {
+    grid-template-columns: 1fr;
   }
 }

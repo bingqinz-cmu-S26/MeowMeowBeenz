@@ -5,8 +5,7 @@
 #   python -m venv .venv && source .venv/bin/activate
 #   pip install -r requirements.txt -r requirements-voice.txt
 #
-livekit-agents~=1.5
+livekit-agents~=1.5             # includes Inference STT (AssemblyAI) — no separate STT plugin/account
 livekit-plugins-openai~=1.5     # MiniMax M2 via OpenAI-compatible endpoint
 livekit-plugins-minimax~=1.5    # MiniMax Speech-02 TTS
-livekit-plugins-deepgram~=1.5   # speech-to-text
 livekit-plugins-silero~=1.5     # voice activity detection / turn-taking

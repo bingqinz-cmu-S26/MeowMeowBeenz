@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatView: View {
     @Environment(AppModel.self) private var app
     @State private var input = ""
+    @State private var showingVoice = false
 
     private let prompts = [
         "How are the cats today?",
@@ -29,6 +30,14 @@ struct ChatView: View {
                 }
             }
             .navigationTitle("Chat")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingVoice = true } label: {
+                        Image(systemName: "mic.circle")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingVoice) { VoiceView() }
             .safeAreaInset(edge: .bottom) { inputBar }
         }
     }

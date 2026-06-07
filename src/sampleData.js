@@ -7,7 +7,7 @@ const scenarioCatalog = {
     confidence: 0.74,
     riskLevel: "normal",
     signals: ["unusual_vocalization"],
-    summary: "Mochi is active and producing repeated meows, which often points to attention or food seeking.",
+    summary: "The cat is active and producing repeated meows, which often points to attention or food seeking.",
     suggestion: "Check the usual routine first: food, water, door access, and recent play time."
   },
   lowActivity: {
@@ -18,7 +18,7 @@ const scenarioCatalog = {
     confidence: 0.82,
     riskLevel: "watch",
     signals: ["low_activity_alert"],
-    summary: "Mochi has stayed in a resting posture with little movement compared with active periods.",
+    summary: "The cat has stayed in a resting posture with little movement compared with active periods.",
     suggestion: "Watch appetite and litter behavior. If low activity persists, consider a vet check-in."
   },
   nightYowl: {
@@ -40,7 +40,7 @@ const scenarioCatalog = {
     confidence: 0.77,
     riskLevel: "watch",
     signals: ["possible_litter_box_issue"],
-    summary: "Mochi appears to be repeatedly digging or visiting the litter area without a clear output event.",
+    summary: "The cat appears to be repeatedly digging or visiting the litter area without a clear output event.",
     suggestion: "Check the litter box and monitor for urination or defecation events."
   },
   appetiteGap: {
@@ -51,7 +51,7 @@ const scenarioCatalog = {
     confidence: 0.71,
     riskLevel: "watch",
     signals: ["possible_appetite_change"],
-    summary: "Mochi vocalized near a routine feeding context, but no eating event has been logged.",
+    summary: "The cat vocalized near a routine feeding context, but no eating event has been logged.",
     suggestion: "Check food and water. If appetite remains low for 24 hours, consider contacting a vet."
   },
   grooming: {
@@ -84,7 +84,7 @@ const scenarioCatalog = {
     confidence: 0.86,
     riskLevel: "normal",
     signals: [],
-    summary: "Mochi appears to be eating with a steady posture and low vocal activity.",
+    summary: "The cat appears to be eating with a steady posture and low vocal activity.",
     suggestion: "Log this as a normal appetite signal."
   },
   play: {
@@ -95,15 +95,29 @@ const scenarioCatalog = {
     confidence: 0.79,
     riskLevel: "normal",
     signals: [],
-    summary: "Mochi is moving actively with playful vocal cues.",
+    summary: "This looks like a normal enrichment or social play moment.",
     suggestion: "This looks like a normal enrichment or social play moment."
   }
 };
 
-export function createScenarioEvent(type = "live") {
+const scenarioToCat = {
+  live: "luna",
+  lowActivity: "milo",
+  nightYowl: "saffron",
+  litterConcern: "milo",
+  appetiteGap: "luna",
+  grooming: "saffron",
+  conflict: "milo",
+  eating: "luna",
+  play: "milo"
+};
+
+export function createScenarioEvent(type = "live", catId = null) {
   const scenario = scenarioCatalog[type] || scenarioCatalog.live;
+  const assignedCat = catId || scenarioToCat[type] || scenarioToCat.live;
   return normalizeEvent({
     ...scenario,
+    catId: assignedCat,
     source: type === "live" ? "live_capture" : "demo_scenario"
   });
 }
@@ -111,23 +125,25 @@ export function createScenarioEvent(type = "live") {
 export function createSeedEvents() {
   const now = new Date();
   const seed = [
-    { type: "eating", minutesAgo: 520 },
-    { type: "play", minutesAgo: 410 },
-    { type: "lowActivity", minutesAgo: 180 },
-    { type: "nightYowl", minutesAgo: 45 },
-    { type: "conflict", minutesAgo: 16 }
+    { type: "eating", minutesAgo: 520, catId: "luna" },
+    { type: "play", minutesAgo: 410, catId: "milo" },
+    { type: "lowActivity", minutesAgo: 180, catId: "milo" },
+    { type: "nightYowl", minutesAgo: 45, catId: "saffron" },
+    { type: "conflict", minutesAgo: 16, catId: "milo" }
   ];
 
   return seed.map((item) => {
-    const event = createScenarioEvent(item.type);
+    const event = createScenarioEvent(item.type, item.catId);
     const time = new Date(now.getTime() - item.minutesAgo * 60 * 1000);
     return { ...event, time: time.toISOString() };
   });
 }
 
 export function normalizeEvent(input) {
+  const catId = typeof input.catId === "string" && input.catId.trim() ? input.catId : "luna";
   return {
     id: `evt_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    catId,
     time: new Date().toISOString(),
     source: input.source || "live_capture",
     state: input.state || "Unknown state",

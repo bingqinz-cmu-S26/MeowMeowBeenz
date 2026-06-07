@@ -9,7 +9,7 @@ fast enough to run on every live-chat turn.
 import re
 from datetime import datetime, time, timedelta, timezone
 
-from app.services.cat_timeline import all_events, find_cat, mood_index, reference_now
+from app.services.cat_timeline import all_events, all_events_async, find_cat, mood_index, reference_now
 
 # Natural-language words -> mood ids. Lets "is she hungry?" hit the soliciting mood, etc.
 MOOD_SYNONYMS: dict[str, str] = {
@@ -44,13 +44,13 @@ def tokenize(text: str) -> list[str]:
     return [t for t in _TOKEN_RE.findall(text.lower()) if t not in STOPWORDS]
 
 
-def detect_cat(question: str, cat: str | None) -> str | None:
+def detect_cat(question: str, cat: str | None, candidates: list[dict]) -> str | None:
     """Resolve which cat the question is about: explicit param wins, else scan names."""
     resolved = find_cat(cat)
     if resolved:
         return resolved["id"]
     lowered = question.lower()
-    for event in all_events():
+    for event in candidates:
         name = event["catName"].lower()
         if name and re.search(rf"\b{re.escape(name)}\b", lowered):
             return event["catId"]
@@ -139,15 +139,17 @@ def score_event(event: dict, tokens: list[str], moods: set[str], window, now: da
     return score
 
 
-def retrieve_events(question: str, cat: str | None = None, limit: int = 6) -> list[dict]:
+async def retrieve_events(question: str, cat: str | None = None, limit: int = 6) -> list[dict]:
     """Return the most relevant timeline events for a question, each with a `score`."""
-    now = reference_now()
-    cat_id = detect_cat(question, cat)
+    candidates = await all_events_async()
+    if not candidates:
+        candidates = all_events()
+    now = reference_now(candidates)
+    cat_id = detect_cat(question, cat, candidates)
     tokens = tokenize(question)
     moods = detect_moods(question)
     window = detect_window(question, now)
 
-    candidates = all_events()
     if cat_id:
         candidates = [e for e in candidates if e["catId"] == cat_id]
 

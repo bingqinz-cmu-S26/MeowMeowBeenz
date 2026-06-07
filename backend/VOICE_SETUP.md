@@ -4,14 +4,16 @@ Architecture: **MiniMax stays the brain.** A LiveKit Agents worker joins the sam
 app and runs the realtime loop:
 
 ```
-mic  ─▶  Deepgram STT  ─▶  MiniMax M2 (LLM)  ─▶  MiniMax Speech-02 (TTS)  ─▶  speaker
-                                │
+mic  ─▶  AssemblyAI STT  ─▶  MiniMax M2 (LLM)  ─▶  MiniMax Speech-02 (TTS)  ─▶  speaker
+        (LiveKit Inference)     │
                                 └── calls the moss retrieval tool (lookup_cat_activity)
                                     over data/mockData.json to ground every answer
 ```
 
-MiniMax has no speech-to-text, so STT is borrowed from Deepgram; everything else (reasoning,
-retrieval grounding, and the voice) is MiniMax. LiveKit handles VAD, turn-taking, and barge-in.
+MiniMax has no speech-to-text, so STT is borrowed — but it runs through **LiveKit Inference**
+(AssemblyAI), billed on your LiveKit key, so there's **no separate STT account**. Everything else
+(reasoning, retrieval grounding, and the voice) is MiniMax. LiveKit handles VAD, turn-taking, and
+barge-in. Note: Inference requires **LiveKit Cloud** (not self-hosted).
 
 ## 1. Backend worker
 
@@ -24,8 +26,7 @@ pip install -r requirements.txt -r requirements-voice.txt
 Set these in the project-root `.env` (see `.env.example`):
 
 - `MINIMAX_API_KEY`, `MINIMAX_MODEL` (default `M2-her`), `MINIMAX_API_URL`
-- `DEEPGRAM_API_KEY`
-- `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
+- `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (also authenticate Inference STT — no Deepgram key needed)
 
 Run it:
 
@@ -58,13 +59,17 @@ npx expo run:ios            # or run:android — a dev build, not Expo Go
 and the Agent-tab button are already wired. Once the worker is running and `LIVEKIT_*` is set, tap
 the button and ask out loud — e.g. "what was Mochi doing last night?" — and Beenz answers hands-free.
 
+## Client
+
+The voice UI is the **native SwiftUI app** (`MeowMeowBeenz/`): Chat tab → mic button → voice sheet
+(`VoiceView` / `VoiceChatModel`), using the LiveKit Swift SDK. It builds and runs on the iOS 26
+simulator. The old Expo `mobile/` client is superseded.
+
 ## Status / not yet done
 
-- The worker (`voice_agent.py`) is written and syntax-checks, but has **not been run
-  end-to-end** here — it needs the `requirements-voice.txt` deps plus live LiveKit/Deepgram/
-  MiniMax credentials and an audio session. Verify with `python voice_agent.py console` first.
-- The mobile voice UI is built but **untested on device** — it needs `npx expo install` + a dev
-  build before it will bundle or run (mobile `tsc` shows missing-module errors until then).
-- Plugin specifics to confirm against the installed versions: the `minimax.TTS` model name
-  (`speech-02-turbo`) and a `voice` id, the `@function_tool` method signature, and the
-  `@livekit/react-native` SDK version pinned in `package.json`.
+- The worker (`voice_agent.py`) syntax-checks but has **not been run end-to-end** here — it needs
+  the `requirements-voice.txt` deps plus live LiveKit Cloud + MiniMax credentials and an audio
+  session. Verify with `python voice_agent.py console` first.
+- Plugin specifics to confirm against the installed versions: the `inference.STT` model string
+  (`assemblyai/universal-streaming`), the `minimax.TTS` model (`speech-02-turbo`) and a `voice` id,
+  and the `@function_tool` method signature.
