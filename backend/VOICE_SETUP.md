@@ -28,11 +28,20 @@ Set these in the project-root `.env` (see `.env.example`):
 - `MINIMAX_API_KEY`, `MINIMAX_MODEL` (default `M2-her`), `MINIMAX_API_URL`
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (also authenticate Inference STT — no Deepgram key needed)
 
-Run it:
+Start everything (API + voice worker) from the project root:
+
+```bash
+./run.sh
+# or: cd backend && .venv/bin/python run.py
+```
+
+`run.py` starts the voice worker automatically when `LIVEKIT_*` is set (`START_VOICE_WORKER=0` to skip).
+
+Debug the worker alone:
 
 ```bash
 python voice_agent.py console   # talk in your terminal, no app/room needed — fastest sanity check
-python voice_agent.py dev       # joins LiveKit rooms (run alongside the FastAPI server)
+python voice_agent.py dev       # joins LiveKit rooms only
 python voice_agent.py start     # production worker
 ```
 

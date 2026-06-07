@@ -6,9 +6,10 @@ The LLM stays MiniMax; STT and TTS go through LiveKit Inference, billed on your 
 This is a SEPARATE process from the FastAPI server (app.main). It connects to a LiveKit
 room as an agent participant and talks to whoever joins (the mobile app).
 
-Run it (from the backend/ directory, after installing requirements-voice.txt):
+Normally started automatically by `python run.py` (or `./run.sh`) when LIVEKIT_* is set.
+Run standalone from backend/ for debugging (after pip install -r requirements-voice.txt):
     python voice_agent.py console   # talk in your terminal, no room needed (quick local test)
-    python voice_agent.py dev       # dev mode: joins LiveKit rooms, hot reload
+    python voice_agent.py dev       # joins LiveKit rooms, hot reload
     python voice_agent.py start     # production worker
 
 Required env (see ../.env.example):
