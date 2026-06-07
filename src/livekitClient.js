@@ -1,6 +1,26 @@
 let room = null;
 let localTracks = [];
 
+export async function stopLiveKitWorker() {
+  const response = await fetch("/api/livekit-token/stop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" }
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok === false) {
+    const msg = payload?.message || payload?.error || "LiveKit worker stop failed.";
+    throw new Error(msg);
+  }
+  return payload;
+}
+
+export async function stopLiveKitWorkerQuiet() {
+  await fetch("/api/livekit-token/stop", {
+    method: "POST",
+    keepalive: true
+  }).catch(() => {});
+}
+
 export async function connectLiveKit({ previewVideo, statusCallback }) {
   const tokenResponse = await fetch("/api/livekit-token", {
     method: "POST",

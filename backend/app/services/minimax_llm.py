@@ -25,6 +25,7 @@ _MINIMAX_STRIP_EXTRA = (
     "safety_identifier",
     "prompt_cache_key",
 )
+_MINIMAX_THINKING_DISABLED = {"type": "disabled"}
 
 _USER_FALLBACK = "Hello."
 _ASSISTANT_FALLBACK = "Okay."
@@ -135,3 +136,14 @@ class MiniMaxLLM(OpenAILLM):
         stream = super().chat(*args, **kwargs)
         stream.__class__ = MiniMaxLLMStream
         return stream
+
+
+def get_minimax_thinking_param(disable: bool) -> dict[str, dict[str, str]] | None:
+    """Return MiniMax thinking control payload.
+
+    `reasoning` can be disabled only for M3-class models; for M2.x and older models
+    the provider may ignore this and still include thinking output.
+    """
+    if not disable:
+        return None
+    return {"thinking": _MINIMAX_THINKING_DISABLED}

@@ -1,12 +1,15 @@
 import json
 import re
+from time import perf_counter
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from app.config import settings
+from app.services.minimax_llm import get_minimax_thinking_param
 from app.services.health_rules import build_range_report
 from app.services.mock_store import get_public_cats
+from app.services.retrieval import retrieve_events
 
 CAT_SPECIFIC_TERMS = {
     "meow", "meows", "yowl", "yowling", "vocal", "vocalization", "sound", "cry", "cried",
@@ -87,17 +90,29 @@ def call_minimax(
     report: dict,
     history: list[dict] | None = None,
     cat_context: dict | None = None,
+    retrieval_events: list[dict] | None = None,
 ) -> str:
     if not settings.minimax_api_key:
         raise ValueError("MINIMAX_API_KEY is not set.")
 
     body = {
         "model": settings.minimax_model,
-        "messages": build_messages(question, timeline[-10:], report, history=history or [], cat_context=cat_context),
+        "messages": build_messages(
+            question,
+            timeline[-10:],
+            report,
+            history=history or [],
+            cat_context=cat_context,
+            retrieval_events=retrieval_events,
+        ),
         "temperature": 0.2,
         "max_tokens": 140,
         "stream": False,
     }
+    thinking_param = get_minimax_thinking_param(settings.minimax_disable_thinking)
+    if thinking_param:
+        body.update(thinking_param)
+
     request = Request(
         settings.minimax_api_url,
         data=json.dumps(body).encode("utf-8"),
@@ -128,6 +143,7 @@ def build_messages(
     report: dict,
     history: list[dict],
     cat_context: dict | None,
+    retrieval_events: list[dict] | None = None,
 ) -> list[dict]:
     system = (
         "You are MeowMeowBeenz's cat wellness assistant. "
@@ -154,6 +170,9 @@ def build_messages(
         "timeline_recent_first": list(reversed(timeline)),
         "recent_chat_history": history[-8:],
     }
+    if retrieval_events is not None:
+        context["retrieval_source"] = retrieval_events[0].get("source", "mockData")
+        context["retrieved_documents"] = retrieval_events[:6]
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
@@ -222,7 +241,7 @@ def _parse_datetime(raw_timestamp: str | datetime) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def ask_agent(
+async def ask_agent(
     question: str,
     timeline: list[dict],
     report: dict | None = None,
@@ -239,18 +258,53 @@ def ask_agent(
     report_data = build_range_report(scoped_timeline, range_name) if resolution["cat"] else (report or build_range_report(timeline, "day"))
     cat_context = resolution["cat"]
     local_profile_answer = answer_profile_question(question, cat_context)
+
+    retrieval_start = perf_counter()
     try:
-        answer = call_minimax(question, scoped_timeline, report_data, history=history, cat_context=cat_context)
-        return {"provider": "minimax", "text": answer}
+        retrieval_events = await retrieve_events(
+            question,
+            cat=cat_context["id"] if isinstance(cat_context, dict) else None,
+            limit=6,
+        )
+        retrieval_error = None
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        retrieval_events = []
+        retrieval_error = str(exc)
+    retrieval_source = None
+    document_source = None
+    if retrieval_events:
+        retrieval_source = retrieval_events[0].get("source", "mockData")
+        document_source = retrieval_events[0].get("retrieval_source") or retrieval_source
+    retrieval_ms = round((perf_counter() - retrieval_start) * 1000)
+    retrieval_info = {
+        "used": bool(retrieval_events),
+        "source": retrieval_source or "mockData",
+        "document_source": document_source or retrieval_source or "mockData",
+        "count": len(retrieval_events),
+        "latency_ms": retrieval_ms,
+        "error": retrieval_error,
+    }
+
+    try:
+        answer = call_minimax(
+            question,
+            scoped_timeline,
+            report_data,
+            history=history,
+            cat_context=cat_context,
+            retrieval_events=retrieval_events,
+        )
+        return {"provider": "minimax", "text": answer, "retrieval": retrieval_info}
     except Exception:
         if local_profile_answer:
-            return {"provider": "local", "text": local_profile_answer}
+            return {"provider": "local", "text": local_profile_answer, "retrieval": retrieval_info}
         return {
             "provider": "local",
             "text": (
                 f"{answer_owner_question(question, scoped_timeline, report_data)}\n\n"
                 "MiniMax is taking too long, so Beenz used the local timeline summary."
             ),
+            "retrieval": retrieval_info,
         }
 
 

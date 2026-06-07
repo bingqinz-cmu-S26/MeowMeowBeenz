@@ -4,10 +4,10 @@ Architecture: **MiniMax stays the brain.** A LiveKit Agents worker joins the sam
 app and runs the realtime loop:
 
 ```
-mic  ─▶  AssemblyAI STT  ─▶  MiniMax M2 (LLM)  ─▶  MiniMax Speech-02 (TTS)  ─▶  speaker
+mic  ─▶  AssemblyAI STT  ─▶  MiniMax M2 (LLM)  ─▶  MiniMax/Cartesia TTS  ─▶  speaker
         (LiveKit Inference)     │
-                                └── calls the moss retrieval tool (lookup_cat_activity)
-                                    over data/mockData.json to ground every answer
+                                └── calls the local timeline lookup tool (lookup_cat_activity)
+                                    -> loads from Moss documents built from `data/mockData.json`
 ```
 
 MiniMax has no speech-to-text, so STT is borrowed — but it runs through **LiveKit Inference**
@@ -27,15 +27,21 @@ Set these in the project-root `.env` (see `.env.example`):
 
 - `MINIMAX_API_KEY`, `MINIMAX_MODEL` (default `M2-her`), `MINIMAX_API_URL`
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (also authenticate Inference STT — no Deepgram key needed)
+- `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` (required to initialize Moss retrieval; timeline documents are still sourced from `data/mockData.json`)
+- `MOSS_AUTO_SEED_INDEX=1` (default) to build the index from `data/mockData.json` on first query.
+  Set to `0` only if you have an existing index you want to reuse as-is.
 
-Start everything (API + voice worker) from the project root:
+Start backend from the project root:
 
 ```bash
 ./run.sh
 # or: cd backend && .venv/bin/python run.py
 ```
 
-`run.py` starts the voice worker automatically when `LIVEKIT_*` is set (`START_VOICE_WORKER=0` to skip).
+`run.py` starts the voice worker automatically only when `START_VOICE_WORKER=1`.
+If `START_VOICE_WORKER` is `0`/unset (default), the backend stays API-only; the worker starts
+on-demand when the `/api/livekit-token` endpoint is hit by the Start Voice Chat flow, and stops when
+the client calls `/api/livekit-token/stop` (for example, when the user disconnects from voice chat).
 
 Debug the worker alone:
 
@@ -45,7 +51,7 @@ python voice_agent.py dev       # joins LiveKit rooms only
 python voice_agent.py start     # production worker
 ```
 
-`console` mode is the quickest way to confirm the MiniMax brain + retrieval tool + TTS work
+`console` mode is the quickest way to confirm the MiniMax brain + local retrieval tool + TTS work
 before wiring up the mobile client.
 
 ## 2. Mobile client

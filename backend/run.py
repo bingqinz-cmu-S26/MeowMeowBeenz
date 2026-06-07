@@ -1,5 +1,4 @@
 import atexit
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -7,16 +6,14 @@ from pathlib import Path
 import uvicorn
 
 from app.config import settings
+from app.services.voice_worker import stop_voice_worker
 
 ROOT = Path(__file__).resolve().parent
 _voice_proc: subprocess.Popen | None = None
 
 
 def _voice_enabled() -> bool:
-    flag = os.getenv("START_VOICE_WORKER")
-    if flag is not None:
-        return flag.strip().lower() not in {"0", "false", "no", "off"}
-    return bool(settings.livekit_url and settings.livekit_api_key and settings.livekit_api_secret)
+    return bool(settings.start_voice_worker)
 
 
 def _start_voice_worker() -> subprocess.Popen | None:
@@ -30,13 +27,14 @@ def _start_voice_worker() -> subprocess.Popen | None:
         [sys.executable, str(ROOT / "voice_agent.py"), "dev"],
         cwd=ROOT,
     )
-    print(f"==> Voice worker started (PID {proc.pid}). Set START_VOICE_WORKER=0 to skip.")
+    print(f"==> Voice worker started (PID {proc.pid}).")
     return proc
 
 
 def _stop_voice_worker() -> None:
     global _voice_proc
     if _voice_proc is None or _voice_proc.poll() is not None:
+        stop_voice_worker()
         return
     print("==> Stopping voice worker...")
     _voice_proc.terminate()
@@ -46,6 +44,7 @@ def _stop_voice_worker() -> None:
         _voice_proc.kill()
         _voice_proc.wait()
     _voice_proc = None
+    stop_voice_worker()
 
 
 def main() -> None:

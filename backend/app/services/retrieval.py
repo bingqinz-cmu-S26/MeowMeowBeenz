@@ -10,6 +10,7 @@ import re
 from datetime import datetime, time, timedelta, timezone
 
 from app.services.cat_timeline import all_events, find_cat, mood_index, reference_now
+from app.services.moss_retrieval import query_moss
 
 # Natural-language words -> mood ids. Lets "is she hungry?" hit the soliciting mood, etc.
 MOOD_SYNONYMS: dict[str, str] = {
@@ -139,13 +140,17 @@ def score_event(event: dict, tokens: list[str], moods: set[str], window, now: da
     return score
 
 
-async def retrieve_events(question: str, cat: str | None = None, limit: int = 6) -> list[dict]:
-    """Return the most relevant timeline events for a question, each with a `score`."""
-    candidates = all_events()
-    now = reference_now(candidates)
-    if cat and not find_cat(cat):
+def _filter_and_rank_local_events(
+    question: str,
+    candidates: list[dict],
+    now: datetime,
+    cat_id: str | None,
+    limit: int,
+) -> list[dict]:
+    if cat_id and not find_cat(cat_id):
         return []
-    cat_id = detect_cat(question, cat, candidates)
+    if cat_id is None:
+        cat_id = detect_cat(question, None, candidates)
     tokens = tokenize(question)
     moods = detect_moods(question)
     window = detect_window(question, now)
@@ -165,7 +170,30 @@ async def retrieve_events(question: str, cat: str | None = None, limit: int = 6)
     else:
         scored.sort(key=lambda pair: (pair[0], pair[1]["when"] or now), reverse=True)
 
-    results = []
+    results: list[dict] = []
     for s, event in scored[:limit]:
-        results.append({**event, "when": None, "score": round(s, 3)})  # drop datetime for JSON safety
+        results.append({**event, "when": None, "score": round(s, 3), "source": "mockData"})
     return results
+
+
+async def retrieve_events(question: str, cat: str | None = None, limit: int = 6) -> list[dict]:
+    """Return the most relevant timeline events for a question, each with a `score`."""
+    candidates = all_events()
+    now = reference_now(candidates)
+    if cat and not find_cat(cat):
+        return []
+
+    cat_id = detect_cat(question, cat, candidates)
+    window = detect_window(question, now)
+
+    moss_events = await query_moss(question, cat_id=cat_id, window=window, limit=limit)
+    if moss_events:
+        return moss_events
+
+    return _filter_and_rank_local_events(
+        question=question,
+        candidates=candidates,
+        now=now,
+        cat_id=cat_id,
+        limit=limit,
+    )

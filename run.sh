@@ -33,7 +33,7 @@ fi
 echo "==> Installing backend dependencies..."
 .venv-backend/bin/pip install -q -r backend/requirements.txt
 
-if grep -qE '^LIVEKIT_URL=.+' .env && [[ "${START_VOICE_WORKER:-1}" != "0" ]]; then
+if grep -qE '^LIVEKIT_URL=.+' .env; then
   echo "==> Installing voice dependencies..."
   .venv-backend/bin/pip install -q -r backend/requirements-voice.txt
 fi
@@ -54,6 +54,6 @@ else
   echo "==> API URL: http://localhost:8000"
 fi
 
-echo "==> Starting backend (+ voice worker when LIVEKIT_* is set)..."
+echo "==> Starting backend..."
 cd backend
 exec ../.venv-backend/bin/python run.py

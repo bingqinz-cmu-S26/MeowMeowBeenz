@@ -1,6 +1,12 @@
 import { askAgent } from "./agentClient.js?v=5";
 import { buildDailyReport, buildRangeReport } from "./healthRules.js?v=3";
-import { connectLiveKit, disconnectLiveKit, isLiveKitConnected } from "./livekitClient.js?v=1";
+import {
+  connectLiveKit,
+  disconnectLiveKit,
+  isLiveKitConnected,
+  stopLiveKitWorker,
+  stopLiveKitWorkerQuiet
+} from "./livekitClient.js?v=2";
 import { analyzeUploadedClip } from "./modelAdapter.js?v=4";
 const fallbackCatAccents = ["#66d19e", "#e4bd5b", "#76c7d8", "#ef7c73", "#d3c7a3"];
 
@@ -132,6 +138,13 @@ function bindEvents() {
     state.activityFilter = button.dataset.filter;
     renderActivity();
   }));
+
+  window.addEventListener("pagehide", async () => {
+    if (!isLiveKitConnected()) return;
+    disconnectLiveKit();
+    state.mediaEnabled = false;
+    await stopLiveKitWorkerQuiet();
+  });
 }
 
 async function loadAppData() {
@@ -278,11 +291,22 @@ function handleClipUpload(file) {
 
 async function handleLiveKitToggle() {
   if (isLiveKitConnected()) {
-    disconnectLiveKit();
-    state.mediaEnabled = false;
-    elements.connectLiveKit.textContent = "Connect LiveKit";
-    elements.mediaMessage.textContent = "Disconnected from LiveKit.";
-    renderMediaState();
+    elements.connectLiveKit.disabled = true;
+    elements.connectLiveKit.textContent = "Disconnecting";
+    try {
+      disconnectLiveKit();
+      await stopLiveKitWorker();
+      state.mediaEnabled = false;
+      elements.mediaMessage.textContent = "Disconnected from LiveKit.";
+      elements.connectLiveKit.textContent = "Connect LiveKit";
+    } catch (error) {
+      state.mediaEnabled = false;
+      elements.connectLiveKit.textContent = "Connect LiveKit";
+      elements.mediaMessage.textContent = `${error.message} Worker may remain running; check backend logs.`;
+    } finally {
+      elements.connectLiveKit.disabled = false;
+      renderMediaState();
+    }
     return;
   }
   elements.connectLiveKit.disabled = true;
@@ -348,11 +372,16 @@ async function handleAsk(question) {
   if (!cleanQuestion) return;
   const report = buildRangeReport(state.events, state.reportRange);
   state.chat.push({ role: "owner", text: cleanQuestion });
-  state.chat.push({ role: "assistant", text: "Thinking with MiniMax...", provider: "minimax" });
+  state.chat.push({ role: "assistant", text: "Thinking with MiniMax...", provider: "minimax", retrieval: null });
   elements.chatInput.value = "";
   renderChat();
   const answer = await askAgent(cleanQuestion, state.events, report);
-  state.chat[state.chat.length - 1] = { role: "assistant", text: answer.text, provider: answer.provider };
+  state.chat[state.chat.length - 1] = {
+    role: "assistant",
+    text: answer.text,
+    provider: answer.provider,
+    retrieval: answer.retrieval || null
+  };
   renderChat();
 }
 
@@ -653,9 +682,23 @@ function renderTimeline() {
 
 function renderChat() {
   elements.chatLog.innerHTML = state.chat.map((message) => `
-    <div class="chat-message ${escapeHtml(message.role)}"><span>${message.role === "owner" ? "Owner" : `Agent · ${escapeHtml(message.provider || "local")}`}</span><p>${escapeHtml(message.text)}</p></div>
+    <div class="chat-message ${escapeHtml(message.role)}"><span>${message.role === "owner" ? "Owner" : `Agent · ${escapeHtml(message.provider || "local")}${formatRetrievalLabel(message.retrieval)}`}</span><p>${escapeHtml(message.text)}</p></div>
   `).join("");
   elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+}
+
+function formatRetrievalLabel(retrieval) {
+  if (!retrieval || !retrieval.used) return "";
+  const count = Number.isFinite(retrieval.count) ? retrieval.count : 0;
+  const latency = Number.isFinite(retrieval.latency_ms) ? retrieval.latency_ms : 0;
+  const docWord = count === 1 ? "doc" : "docs";
+  const pronoun = count === 1 ? "it" : "them";
+  const source = retrieval.source || "mockData";
+  const documentSource = retrieval.document_source || source;
+  if (source === "moss") {
+    return ` · Moss found ${count} ${docWord} from ${escapeHtml(documentSource)} and retrieved ${pronoun} in ${latency}ms`;
+  }
+  return ` · Local mockData lookup found ${count} ${docWord} and retrieved ${pronoun} in ${latency}ms`;
 }
 
 function renderActivity() {

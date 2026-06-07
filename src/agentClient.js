@@ -13,12 +13,14 @@ export async function askAgent(question, timeline, report) {
     }
     return {
       provider: data.provider || "minimax",
-      text: data.answer
+      text: data.answer,
+      retrieval: data.retrieval || null
     };
   } catch (error) {
     return {
       provider: "local",
-      text: `${answerOwnerQuestion(question, timeline, report)}\n\nMiniMax is taking too long, so Beenz used the local timeline summary.`
+      text: `${answerOwnerQuestion(question, timeline, report)}\n\nMiniMax is taking too long, so Beenz used the local timeline summary.`,
+      retrieval: null
     };
   }
 }

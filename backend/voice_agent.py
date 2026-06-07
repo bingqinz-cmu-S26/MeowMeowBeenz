@@ -1,6 +1,6 @@
 """Hands-free voice agent for MeowMeowBeenz (LiveKit Agents worker).
 
-Pipeline: AssemblyAI STT (via LiveKit Inference)  ->  MiniMax M2 LLM (with moss retrieval as a tool)  ->  Cartesia TTS (via LiveKit Inference).
+Pipeline: AssemblyAI STT (via LiveKit Inference)  ->  MiniMax M2 LLM (with local timeline lookup as a tool)  ->  Cartesia TTS (via LiveKit Inference).
 The LLM stays MiniMax; STT and TTS go through LiveKit Inference, billed on your LiveKit key.
 
 This is a SEPARATE process from the FastAPI server (app.main). It connects to a LiveKit
@@ -20,6 +20,7 @@ STT uses LiveKit Inference (AssemblyAI), authenticated by your LiveKit credentia
 no separate Deepgram/AssemblyAI account. Requires LiveKit Cloud (Inference is not on self-hosted).
 """
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -32,10 +33,12 @@ from livekit.agents import Agent, AgentSession, JobContext, RunContext, WorkerOp
 from livekit.plugins import silero
 
 from app.services.minimax_llm import MiniMaxLLM
+from app.services.minimax_llm import get_minimax_thinking_param
 
 from app.config import settings
 from app.services.agent import friendly_time
 from app.services.cat_timeline import get_cats, reference_now
+from app.services.moss_retrieval import preload_moss_index
 from app.services.retrieval import retrieve_events
 
 # LiveKit worker CLI reads os.environ directly (not pydantic settings).
@@ -99,7 +102,7 @@ class CatWellnessAgent(Agent):
         question: str,
         cat: str | None = None,
     ) -> dict:
-        """Retrieve what a cat was doing from the observation timeline (moss retrieval).
+        """Retrieve what a cat was doing from the observation timeline.
 
         Call this whenever the owner asks about a cat's behavior, mood, or a time window.
 
@@ -129,6 +132,9 @@ class CatWellnessAgent(Agent):
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
 
+    minimax_extra_body = get_minimax_thinking_param(settings.minimax_disable_thinking)
+
+    moss_preload = asyncio.create_task(preload_moss_index())
     session = AgentSession(
         stt=inference.STT(model="assemblyai/universal-streaming", language="en"),
         llm=MiniMaxLLM(
@@ -136,10 +142,15 @@ async def entrypoint(ctx: JobContext) -> None:
             base_url=_minimax_base_url(),
             api_key=settings.minimax_api_key,
             _strict_tool_schema=False,
+            **({"extra_body": minimax_extra_body} if minimax_extra_body is not None else {}),
         ),
         tts=inference.TTS(model="cartesia/sonic", voice=""),
         vad=silero.VAD.load(),
     )
+    if await moss_preload:
+        logger.info("Moss ready for voice session.")
+    else:
+        logger.debug("Moss preload skipped or unavailable; timeline lookup will use local fallback.")
 
     await session.start(agent=CatWellnessAgent(), room=ctx.room)
     await session.generate_reply(
