@@ -2,44 +2,7 @@ import { askAgent } from "./agentClient.js?v=5";
 import { buildDailyReport, buildRangeReport } from "./healthRules.js?v=3";
 import { connectLiveKit, disconnectLiveKit, isLiveKitConnected } from "./livekitClient.js?v=1";
 import { analyzeUploadedClip } from "./modelAdapter.js?v=4";
-import { createScenarioEvent, createSeedEvents, scenarioTypes } from "./sampleData.js?v=2";
-
-const storageKey = "meowmeowbeenz-events";
-
-const catProfiles = [
-  {
-    id: "luna",
-    name: "Luna",
-    initials: "Lu",
-    age: "4 yrs",
-    breed: "Domestic shorthair",
-    room: "Kitchen window",
-    routine: "Breakfast, window watch, evening cuddle time",
-    avatar: "https://placekitten.com/320/320",
-    accent: "#66d19e"
-  },
-  {
-    id: "milo",
-    name: "Milo",
-    initials: "Mi",
-    age: "2 yrs",
-    breed: "Tabby mix",
-    room: "Living room",
-    routine: "Long sleep blocks and stretch breaks",
-    accent: "#e4bd5b"
-  },
-  {
-    id: "saffron",
-    name: "Saffron",
-    initials: "Sa",
-    age: "8 mo",
-    breed: "Maine Coon mix",
-    room: "Bedroom",
-    routine: "Play bursts, snack patrol, quick naps",
-    avatar: "https://placekitten.com/321/321",
-    accent: "#76c7d8"
-  }
-];
+const fallbackCatAccents = ["#66d19e", "#e4bd5b", "#76c7d8", "#ef7c73", "#d3c7a3"];
 
 const state = {
   activeTab: "home",
@@ -50,7 +13,9 @@ const state = {
   uploadedClipUrl: "",
   selectedClipFile: null,
   clipAnalysis: null,
-  events: loadEvents(),
+  events: [],
+  cats: [],
+  scenarios: [],
   chat: [
     {
       role: "assistant",
@@ -113,8 +78,8 @@ const elements = {
 };
 
 bindEvents();
-renderScenarioButtons();
 render();
+loadAppData();
 
 function bindEvents() {
   elements.tabs.forEach((button) => button.addEventListener("click", () => switchTab(button.dataset.tab)));
@@ -152,16 +117,8 @@ function bindEvents() {
   });
   elements.connectLiveKit.addEventListener("click", handleLiveKitToggle);
   elements.analyzeNow.addEventListener("click", handleAnalyze);
-  elements.seedDemo.addEventListener("click", () => {
-    state.events = createSeedEvents();
-    saveEvents();
-    render();
-  });
-  elements.clearTimeline.addEventListener("click", () => {
-    state.events = [];
-    saveEvents();
-    render();
-  });
+  elements.seedDemo.addEventListener("click", handleSeedDemo);
+  elements.clearTimeline.addEventListener("click", handleClearTimeline);
   elements.chatForm.addEventListener("submit", (event) => {
     event.preventDefault();
     handleAsk(elements.chatInput.value);
@@ -175,6 +132,97 @@ function bindEvents() {
     state.activityFilter = button.dataset.filter;
     renderActivity();
   }));
+}
+
+async function loadAppData() {
+  try {
+    await loadCats();
+    await Promise.all([loadScenarios(), loadEvents()]);
+  } catch (error) {
+    elements.mediaMessage.textContent = `Data load failed: ${error.message}`;
+  } finally {
+    render();
+  }
+}
+
+function normalizeCats(rawCats) {
+  return rawCats.map((cat, index) => {
+    const name = String(cat?.name || `Cat ${index + 1}`).trim();
+    const initial = String(cat?.initials || generateInitials(name)).trim().toUpperCase();
+    return {
+      id: String(cat?.id || `cat_${index}`).trim().toLowerCase(),
+      name,
+      initials: initial,
+      age: String(cat?.age || "unknown"),
+      breed: String(cat?.breed || "Domestic cat"),
+      room: String(cat?.room || "Home"),
+      routine: String(cat?.routine || "Routine tracking starts with synced timeline events."),
+      avatar: String(cat?.avatar || ""),
+      accent: String(cat?.accent || fallbackCatAccents[index % fallbackCatAccents.length])
+    };
+  });
+}
+
+function generateInitials(name) {
+  const normalized = String(name || "").trim();
+  if (!normalized) return "??";
+  const parts = normalized.split(/\s+/);
+  if (parts.length === 1) return normalized.slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+async function requestApiJson(url, options = {}) {
+  const response = await fetch(url, {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok === false) {
+    const errorMessage = payload.detail || payload.message || `Request failed with status ${response.status}`;
+    throw new Error(errorMessage);
+  }
+  return payload;
+}
+
+async function loadCats() {
+  const response = await requestApiJson("/api/cats/public", { method: "GET" });
+  const rawCats = Array.isArray(response.cats) ? response.cats : [];
+  state.cats = normalizeCats(rawCats);
+}
+
+async function loadScenarios() {
+  const response = await requestApiJson("/api/events/scenarios", { method: "GET" });
+  const rawScenarios = Array.isArray(response.scenarios) ? response.scenarios : [];
+  state.scenarios = rawScenarios
+    .filter((item) => item?.id && item?.label)
+    .map((item) => ({ id: String(item.id), label: String(item.label) }));
+}
+
+async function loadEvents() {
+  const response = await requestApiJson("/api/events");
+  const rawEvents = Array.isArray(response.events) ? response.events : [];
+  state.events = rawEvents.map((event, index) => normalizeEventCat(event, index));
+}
+
+async function handleSeedDemo() {
+  try {
+    const response = await requestApiJson("/api/events/seed", { method: "POST" });
+    const rawEvents = Array.isArray(response.events) ? response.events : [];
+    state.events = rawEvents.map((event, index) => normalizeEventCat(event, index));
+    render();
+  } catch (error) {
+    elements.mediaMessage.textContent = `Failed to seed timeline: ${error.message}`;
+  }
+}
+
+async function handleClearTimeline() {
+  try {
+    await requestApiJson("/api/events", { method: "DELETE" });
+    state.events = [];
+    render();
+  } catch (error) {
+    elements.mediaMessage.textContent = `Failed to clear timeline: ${error.message}`;
+  }
 }
 
 function switchTab(tab) {
@@ -311,12 +359,23 @@ async function handleAsk(question) {
 function addEvent(event) {
   const normalized = normalizeEventCat(event);
   state.events = [...state.events, normalized].slice(-80);
-  saveEvents();
   render();
+}
+
+async function handleScenarioAdd(type) {
+  try {
+    const response = await requestApiJson(`/api/events/scenario/${encodeURIComponent(type)}`, { method: "POST" });
+    if (response?.event) {
+      addEvent(response.event);
+    }
+  } catch (error) {
+    elements.mediaMessage.textContent = `Failed to add scenario: ${error.message}`;
+  }
 }
 
 function render() {
   renderTabs();
+  renderScenarioButtons();
   renderHome();
   renderMediaState();
   renderCurrentStatus();
@@ -379,7 +438,7 @@ function renderInsight(catStates) {
 }
 
 function buildCatHomeState() {
-  return catProfiles.map((cat) => {
+  return state.cats.map((cat) => {
     const report = buildRangeReport(getCatEvents(cat.id), "day");
     return {
       ...cat,
@@ -445,7 +504,7 @@ function renderHomeStats(report, cats, householdStatus) {
 
 function getCatEventBuckets(events) {
   const normalized = Array.isArray(events) ? events.map((event, index) => normalizeEventCat(event, index)) : [];
-  return catProfiles.map((cat) => ({
+  return state.cats.map((cat) => ({
     cat,
     events: normalized.filter((event) => event.catId === cat.id)
   }));
@@ -529,8 +588,16 @@ function renderMediaState() {
 }
 
 function renderScenarioButtons() {
-  elements.scenarioButtons.innerHTML = scenarioTypes.map((scenario) => `<button class="scenario-button" data-scenario="${escapeHtml(scenario.id)}" type="button">${escapeHtml(scenario.label)}</button>`).join("");
-  elements.scenarioButtons.querySelectorAll(".scenario-button").forEach((button) => button.addEventListener("click", () => addEvent(createScenarioEvent(button.dataset.scenario))));
+  if (!state.scenarios.length) {
+    elements.scenarioButtons.innerHTML = "";
+    return;
+  }
+  elements.scenarioButtons.innerHTML = state.scenarios
+    .map((scenario) => `<button class="scenario-button" data-scenario="${escapeHtml(scenario.id)}" type="button">${escapeHtml(scenario.label)}</button>`)
+    .join("");
+  elements.scenarioButtons.querySelectorAll(".scenario-button").forEach((button) => {
+    button.addEventListener("click", () => handleScenarioAdd(button.dataset.scenario));
+  });
 }
 
 function renderCurrentStatus() {
@@ -661,7 +728,7 @@ function renderActivityBars(counts) {
 
 function renderHealth() {
   const report = buildRangeReport(state.events, state.reportRange);
-  const catReports = catProfiles.map((cat) => ({
+  const catReports = state.cats.map((cat) => ({
     ...cat,
     report: buildRangeReport(getCatEvents(cat.id), state.reportRange)
   }));
@@ -763,46 +830,47 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 }
 
-function loadEvents() {
-  try {
-    const current = JSON.parse(localStorage.getItem(storageKey));
-    if (current) return (Array.isArray(current) ? current : []).map((event, index) => normalizeEventCat(event, index));
-    const legacy = JSON.parse(localStorage.getItem("mochi-monitor-events"));
-    return Array.isArray(legacy) ? legacy.map((event, index) => normalizeEventCat(event, index)) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveEvents() {
-  localStorage.setItem(storageKey, JSON.stringify(state.events));
-}
-
 function normalizeEventCat(event, fallbackIndex = 0) {
   if (!event || typeof event !== "object") {
     return {
-      catId: catProfiles[0]?.id || "luna",
+      catId: state.cats[0]?.id || "cat_0",
       time: new Date().toISOString()
     };
   }
 
-  if (isKnownCatId(event.catId)) return { ...event, catId: String(event.catId).trim().toLowerCase() };
-  return {
-    ...event,
-    catId: pickFallbackCatId(event, fallbackIndex)
+  const rawCatId = String(event.catId || "").trim().toLowerCase();
+  const safeEvent = {
+    id: String(event.id || `evt_${Date.now()}_${Math.random().toString(16).slice(2)}`),
+    catId: rawCatId,
+    time: new Date(event.time || Date.now()).toISOString(),
+    source: String(event.source || "api"),
+    state: String(event.state || "Unknown state"),
+    intent: String(event.intent || "unknown"),
+    behaviorLabel: String(event.behaviorLabel || "unknown"),
+    soundType: String(event.soundType || "unknown"),
+    confidence: Number(event.confidence || 0),
+    riskLevel: String(event.riskLevel || "normal"),
+    signals: Array.isArray(event.signals) ? event.signals.map((item) => String(item)) : [],
+    summary: String(event.summary || "The model returned an uncertain observation."),
+    suggestion: String(event.suggestion || "Keep observing and add context.")
   };
+
+  if (isKnownCatId(rawCatId)) return { ...safeEvent, catId: rawCatId };
+  return { ...safeEvent, catId: pickFallbackCatId(event, fallbackIndex) };
 }
 
 function isKnownCatId(id) {
   if (typeof id !== "string") return false;
-  return catProfiles.some((cat) => cat.id === id.trim().toLowerCase());
+  if (!state.cats.length) return id.trim().length > 0;
+  return state.cats.some((cat) => cat.id === id.trim().toLowerCase());
 }
 
 function pickFallbackCatId(event, fallbackIndex = 0) {
+  if (!state.cats.length) return "cat_unknown";
   const key = `${fallbackIndex}-${event.id || ""}-${event.time || ""}-${event.state || ""}`;
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
     hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
   }
-  return catProfiles[hash % catProfiles.length].id;
+  return state.cats[hash % state.cats.length].id;
 }

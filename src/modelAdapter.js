@@ -1,5 +1,3 @@
-import { createScenarioEvent, normalizeEvent } from "./sampleData.js";
-
 export async function analyzeUploadedClip(file) {
   const form = new FormData();
   form.append("clip", file);
@@ -13,11 +11,12 @@ export async function analyzeUploadedClip(file) {
     throw new Error(data.error || "Clip analysis failed.");
   }
 
-  const event = normalizeEvent({
-    ...(data.event || data.analysis || {}),
-    source: "uploaded_clip_analysis",
-    summary: data.event?.summary || data.analysis?.summary || data.text || "The model analyzed this clip."
-  });
+  const rawEvent = data.event || data.analysis || {};
+  const event = {
+    ...rawEvent,
+    source: rawEvent.source || "uploaded_clip_analysis",
+    summary: rawEvent.summary || data.text || "The model analyzed this clip."
+  };
 
   return {
     provider: data.provider || "cat-model",
@@ -28,23 +27,31 @@ export async function analyzeUploadedClip(file) {
 }
 
 export async function analyzeCurrentMoment({ mediaEnabled, timeline }) {
+  if (mediaEnabled) {
+    const recentWatchEvents = timeline.filter((event) => event.riskLevel !== "normal").length;
+    if (recentWatchEvents >= 3) {
+      return requestScenarioEvent("conflict");
+    }
+  }
+
+  return requestScenarioEvent("live");
+}
+
+async function requestScenarioEvent(type) {
   await wait(450);
 
-  if (!mediaEnabled) {
-    const fallback = createScenarioEvent("live");
-    return {
-      ...fallback,
-      source: "demo_without_media",
-      summary: "Demo analysis used a simulated audio/video window because media preview is not active."
-    };
+  const response = await fetch(`/api/events/scenario/${type}`, {
+    method: "POST"
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok || !data.event) {
+    throw new Error(data.error || "Scenario event unavailable.");
   }
 
-  const recentWatchEvents = timeline.filter((event) => event.riskLevel !== "normal").length;
-  if (recentWatchEvents >= 3) {
-    return createScenarioEvent("conflict");
-  }
-
-  return createScenarioEvent("live");
+  return {
+    ...data.event,
+    source: data.event.source || type
+  };
 }
 
 function wait(ms) {
