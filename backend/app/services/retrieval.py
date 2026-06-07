@@ -9,7 +9,7 @@ fast enough to run on every live-chat turn.
 import re
 from datetime import datetime, time, timedelta, timezone
 
-from app.services.cat_timeline import all_events, all_events_async, find_cat, mood_index, reference_now
+from app.services.cat_timeline import all_events, find_cat, mood_index, reference_now
 
 # Natural-language words -> mood ids. Lets "is she hungry?" hit the soliciting mood, etc.
 MOOD_SYNONYMS: dict[str, str] = {
@@ -141,10 +141,10 @@ def score_event(event: dict, tokens: list[str], moods: set[str], window, now: da
 
 async def retrieve_events(question: str, cat: str | None = None, limit: int = 6) -> list[dict]:
     """Return the most relevant timeline events for a question, each with a `score`."""
-    candidates = await all_events_async()
-    if not candidates:
-        candidates = all_events()
+    candidates = all_events()
     now = reference_now(candidates)
+    if cat and not find_cat(cat):
+        return []
     cat_id = detect_cat(question, cat, candidates)
     tokens = tokenize(question)
     moods = detect_moods(question)

@@ -87,7 +87,7 @@ class CatWellnessAgent(Agent):
 
         Args:
             question: The owner's question, e.g. "what was Mochi doing last night".
-            cat: Optional cat name to focus on (e.g. Mochi, Luna, Tofu, Biscuit).
+            cat: Optional cat name to focus on. Use one of the household cat names from the instructions.
         """
         events = await retrieve_events(question, cat=cat, limit=6)
         if not events:
