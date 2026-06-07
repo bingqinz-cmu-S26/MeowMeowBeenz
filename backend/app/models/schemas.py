@@ -34,6 +34,8 @@ class UpdateCatRequest(BaseModel):
 
 class TimelineEvent(BaseModel):
     id: str
+    catId: str | None = None
+    catName: str | None = None
     time: str
     source: str
     state: str
@@ -76,10 +78,16 @@ class HealthReport(BaseModel):
     summary: str
 
 
+class AgentHistoryMessage(BaseModel):
+    role: str
+    text: str
+
+
 class AgentRequest(BaseModel):
     question: str
     timeline: list[TimelineEvent] = Field(default_factory=list)
     report: HealthReport | dict = Field(default_factory=dict)
+    history: list[AgentHistoryMessage] = Field(default_factory=list)
 
 
 class LiveKitTokenRequest(BaseModel):

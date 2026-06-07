@@ -19,9 +19,11 @@ struct ReportsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
+                    CatSelector()
+
                     SoftCard(
                         title: "Range",
-                        subtitle: "Select a reporting window",
+                        subtitle: "\(app.selectedCat?.name ?? "Selected cat") reporting window",
                         icon: "calendar",
                         accent: .indigo
                     ) {

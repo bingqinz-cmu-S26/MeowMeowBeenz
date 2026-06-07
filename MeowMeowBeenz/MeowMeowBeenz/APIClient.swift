@@ -123,13 +123,18 @@ struct APIClient: Sendable {
         try await request("/api/cats", authorized: true, as: CatsResponse.self).cats
     }
 
+    func publicCats() async throws -> [CatProfile] {
+        try await request("/api/cats/public", as: CatsResponse.self).cats
+    }
+
     func createCat(name: String, birthDate: String, device: String?) async throws -> CatProfile {
         let body = ["name": name, "birth_date": birthDate, "device": device ?? ""]
         return try await request("/api/cats", method: "POST", body: Self.encode(body), authorized: true, as: CatResponse.self).cat
     }
 
-    func events() async throws -> [TimelineEvent] {
-        try await request("/api/events", as: EventsResponse.self).events
+    func events(catId: String? = nil) async throws -> [TimelineEvent] {
+        let path = catQueryPath("/api/events", catId: catId)
+        return try await request(path, as: EventsResponse.self).events
     }
 
     func seedEvents() async throws -> [TimelineEvent] {
@@ -145,13 +150,38 @@ struct APIClient: Sendable {
         try await request("/api/events/scenarios", as: ScenariosResponse.self).scenarios
     }
 
-    func report(range: ReportRange) async throws -> HealthReport {
-        try await request("/api/report?range=\(range.rawValue)", as: ReportResponse.self).report
+    func report(range: ReportRange, catId: String? = nil) async throws -> HealthReport {
+        var path = "/api/report?range=\(range.rawValue)"
+        if let catId = normalizedCatId(catId) {
+            path += "&cat_id=\(catId)"
+        }
+        return try await request(path, as: ReportResponse.self).report
     }
 
-    func ask(question: String, timeline: [TimelineEvent], report: HealthReport?) async throws -> AgentResponse {
-        struct AgentBody: Encodable { let question: String; let timeline: [TimelineEvent]; let report: HealthReport? }
-        let body = AgentBody(question: question, timeline: timeline, report: report)
+    private func catQueryPath(_ path: String, catId: String?) -> String {
+        guard let catId = normalizedCatId(catId) else { return path }
+        return "\(path)?cat_id=\(catId)"
+    }
+
+    private func normalizedCatId(_ catId: String?) -> String? {
+        let trimmed = (catId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
+    }
+
+    func ask(
+        question: String,
+        timeline: [TimelineEvent],
+        report: HealthReport?,
+        history: [AgentHistoryMessage]
+    ) async throws -> AgentResponse {
+        struct AgentBody: Encodable {
+            let question: String
+            let timeline: [TimelineEvent]
+            let report: HealthReport?
+            let history: [AgentHistoryMessage]
+        }
+        let body = AgentBody(question: question, timeline: timeline, report: report, history: history)
         return try await request("/api/agent", method: "POST", body: Self.encode(body))
     }
 

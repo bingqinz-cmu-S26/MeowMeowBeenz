@@ -262,6 +262,8 @@ def _event_from_timeline_event(event: Mapping[str, Any], source: str = "mockData
     action = str(event.get("action") or "Observed").strip()
     mood_meta = mood_index().get(mood, {})
     cat_id = str(event.get("catId") or "").strip().lower() or (_runtime_cats()[0]["id"] if _runtime_cats() else "cat_0")
+    cat = get_cat_by_id(cat_id)
+    cat_name = str(event.get("catName") or (cat.get("name") if cat else "") or "Cat").strip()
     timestamp = str(event.get("timestamp") or datetime.now(timezone.utc).isoformat())
     summary = str(event.get("description") or mood_meta.get("summary", "Observed behavior")).strip()
     suggestion = f"Watch for pattern changes around {action.lower()} if this repeats frequently."
@@ -269,6 +271,7 @@ def _event_from_timeline_event(event: Mapping[str, Any], source: str = "mockData
     return {
         "id": f"evt_{cat_id}_{int(datetime.now(timezone.utc).timestamp() * 1000)}_{secrets.token_hex(2)}",
         "catId": cat_id,
+        "catName": cat_name,
         "time": timestamp,
         "source": source,
         "state": action,
@@ -288,6 +291,7 @@ def _normalize_event_payload(payload: Mapping[str, Any], source: str = "local") 
     if not cat_id or not get_cat_by_id(cat_id):
         default_cat = _runtime_cats()[0]["id"] if _runtime_cats() else "cat_0"
         cat_id = default_cat
+    cat = get_cat_by_id(cat_id)
 
     raw_time = payload.get("time")
     if not raw_time:
@@ -296,6 +300,7 @@ def _normalize_event_payload(payload: Mapping[str, Any], source: str = "local") 
     event: dict[str, Any] = {
         "id": str(payload.get("id") or _new_event_id(cat_id)),
         "catId": cat_id,
+        "catName": str(payload.get("catName") or (cat.get("name") if cat else "") or "Cat").strip(),
         "time": str(raw_time),
         "source": str(payload.get("source") or source),
         "state": str(payload.get("state") or "Observed").strip() or "Observed",
@@ -324,6 +329,13 @@ def _seed_events_from_mock() -> list[dict]:
 
 def get_events() -> list[dict]:
     return _sort_events(deepcopy(_runtime_events()))
+
+
+def filter_events_by_cat(events: list[dict], cat_id: str | None) -> list[dict]:
+    target = str(cat_id or "").strip().lower()
+    if not target:
+        return events
+    return [event for event in events if str(event.get("catId", "")).strip().lower() == target]
 
 
 def add_event(payload: Mapping[str, Any], source: str = "local") -> dict:

@@ -7,9 +7,11 @@ struct DataView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
+                    CatSelector()
+
                     SoftCard(
                         title: "Recent meows",
-                        subtitle: "\(app.events.count) events loaded",
+                        subtitle: "\(app.selectedCat?.name ?? "Selected cat") · \(app.events.count) events loaded",
                         icon: "waveform.path.ecg",
                         accent: .purple
                     ) {
@@ -59,6 +61,9 @@ struct EventRow: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {
+                if let catName = event.catName, !catName.isEmpty {
+                    SoftChip(text: catName, tone: .pink)
+                }
                 SoftChip(text: Format.humanize(event.intent), tone: risk.color)
                 SoftChip(text: Format.percent(event.confidence), tone: .blue)
             }

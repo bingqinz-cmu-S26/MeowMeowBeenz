@@ -21,6 +21,8 @@
 		AA000000000000000000B010 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F010 /* AccountView.swift */; };
 		AA000000000000000000B011 /* VoiceChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F011 /* VoiceChatModel.swift */; };
 		AA000000000000000000B012 /* VoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F012 /* VoiceView.swift */; };
+		AA000000000000000000B013 /* MockDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F013 /* MockDataStore.swift */; };
+		AA000000000000000000B014 /* mockData.json in Resources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000F014 /* mockData.json */; };
 		AA000000000000000000B100 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000D001 /* LiveKit */; };
 /* End PBXBuildFile section */
 
@@ -40,6 +42,8 @@
 		AA000000000000000000F010 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		AA000000000000000000F011 /* VoiceChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceChatModel.swift; sourceTree = "<group>"; };
 		AA000000000000000000F012 /* VoiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceView.swift; sourceTree = "<group>"; };
+		AA000000000000000000F013 /* MockDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockDataStore.swift; sourceTree = "<group>"; };
+		AA000000000000000000F014 /* mockData.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ../../data/mockData.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,6 +91,8 @@
 				AA000000000000000000F010 /* AccountView.swift */,
 				AA000000000000000000F011 /* VoiceChatModel.swift */,
 				AA000000000000000000F012 /* VoiceView.swift */,
+				AA000000000000000000F013 /* MockDataStore.swift */,
+				AA000000000000000000F014 /* mockData.json */,
 			);
 			path = MeowMeowBeenz;
 			sourceTree = "<group>";
@@ -155,6 +161,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA000000000000000000B014 /* mockData.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -179,6 +186,7 @@
 				AA000000000000000000B010 /* AccountView.swift in Sources */,
 				AA000000000000000000B011 /* VoiceChatModel.swift in Sources */,
 				AA000000000000000000B012 /* VoiceView.swift in Sources */,
+				AA000000000000000000B013 /* MockDataStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

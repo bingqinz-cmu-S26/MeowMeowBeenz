@@ -7,6 +7,19 @@ from urllib.request import Request, urlopen
 from app.config import settings
 from app.services.health_rules import build_range_report
 
+CAT_SPECIFIC_TERMS = {
+    "meow", "meows", "yowl", "yowling", "vocal", "vocalization", "sound", "cry", "cried",
+    "doing", "feeling", "mood", "ate", "eating", "food", "hungry", "litter", "sleep",
+    "sleeping", "play", "playing", "groom", "grooming", "scratch", "scratching", "worry",
+    "concern", "sick", "hurt", "pain", "stiff", "hiding", "restless",
+}
+SINGULAR_CAT_REFERENCES = {
+    "cat", "kitty", "he", "him", "his", "she", "her", "hers", "they", "them", "their",
+}
+HOUSEHOLD_TERMS = {
+    "cats", "everyone", "everybody", "all", "household", "both", "overall", "together",
+}
+
 
 def answer_owner_question(question: str, timeline: list[dict], report: dict) -> str:
     normalized = question.strip().lower()
@@ -67,13 +80,19 @@ def build_daily_answer(timeline: list[dict], report: dict) -> str:
     )
 
 
-def call_minimax(question: str, timeline: list[dict], report: dict) -> str:
+def call_minimax(
+    question: str,
+    timeline: list[dict],
+    report: dict,
+    history: list[dict] | None = None,
+    cat_context: dict | None = None,
+) -> str:
     if not settings.minimax_api_key:
         raise ValueError("MINIMAX_API_KEY is not set.")
 
     body = {
         "model": settings.minimax_model,
-        "messages": build_messages(question, timeline[-10:], report),
+        "messages": build_messages(question, timeline[-10:], report, history=history or [], cat_context=cat_context),
         "temperature": 0.2,
         "max_tokens": 260,
         "stream": False,
@@ -102,10 +121,18 @@ def call_minimax(question: str, timeline: list[dict], report: dict) -> str:
         raise RuntimeError("MiniMax response did not include choices[0].message.content.") from error
 
 
-def build_messages(question: str, timeline: list[dict], report: dict) -> list[dict]:
+def build_messages(
+    question: str,
+    timeline: list[dict],
+    report: dict,
+    history: list[dict],
+    cat_context: dict | None,
+) -> list[dict]:
     system = (
         "You are MeowMeowBeenz's cat wellness assistant. "
-        "Answer directly using only the provided timeline and daily report. "
+        "Answer directly using only the provided timeline, daily report, and recent chat history. "
+        "The backend has already resolved whether the owner means one cat or the whole household. "
+        "If selected_cat is present, answer about that cat only. If selected_cat is null, answer about the household only. "
         "Do not deliberate, reason step-by-step, or explain your process. "
         "Start with the answer. "
         "You may discuss behavior, intent, routine changes, and monitoring suggestions. "
@@ -116,8 +143,10 @@ def build_messages(question: str, timeline: list[dict], report: dict) -> list[di
     )
     context = {
         "owner_question": question,
+        "selected_cat": cat_context,
         "daily_report": report,
         "timeline_recent_first": list(reversed(timeline)),
+        "recent_chat_history": history[-8:],
     }
     return [
         {"role": "system", "content": system},
@@ -179,16 +208,102 @@ def _parse_datetime(raw_timestamp: str | datetime) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def ask_agent(question: str, timeline: list[dict], report: dict | None = None) -> dict:
-    report_data = report or build_range_report(timeline, "day")
+def ask_agent(
+    question: str,
+    timeline: list[dict],
+    report: dict | None = None,
+    history: list[dict] | None = None,
+) -> dict:
+    history = history or []
+    resolution = resolve_cat_context(question, timeline, history)
+    if resolution["needs_clarification"]:
+        return {"provider": "local", "text": clarification_text(resolution["cats"])}
+
+    scoped_timeline = resolution["timeline"]
+    range_name = (report or {}).get("range", "day") if isinstance(report, dict) else "day"
+    report_data = build_range_report(scoped_timeline, range_name) if resolution["cat"] else (report or build_range_report(timeline, "day"))
+    cat_context = resolution["cat"]
     try:
-        answer = call_minimax(question, timeline, report_data)
+        answer = call_minimax(question, scoped_timeline, report_data, history=history, cat_context=cat_context)
         return {"provider": "minimax", "text": answer}
     except Exception:
         return {
             "provider": "local",
             "text": (
-                f"{answer_owner_question(question, timeline, report_data)}\n\n"
+                f"{answer_owner_question(question, scoped_timeline, report_data)}\n\n"
                 "MiniMax is taking too long, so Beenz used the local timeline summary."
             ),
         }
+
+
+def resolve_cat_context(question: str, timeline: list[dict], history: list[dict]) -> dict:
+    cats = cats_from_timeline(timeline)
+    cat = detect_cat_in_text(question, cats)
+    if cat is None and uses_contextual_reference(question):
+        cat = detect_cat_in_history(history, cats, current_question=question)
+
+    if cat:
+        scoped = [event for event in timeline if event.get("catId") == cat["id"]]
+        return {"cat": cat, "timeline": scoped, "needs_clarification": False, "cats": cats}
+
+    if should_ask_which_cat(question, cats):
+        return {"cat": None, "timeline": timeline, "needs_clarification": True, "cats": cats}
+
+    return {"cat": None, "timeline": timeline, "needs_clarification": False, "cats": cats}
+
+
+def cats_from_timeline(timeline: list[dict]) -> list[dict]:
+    by_id: dict[str, dict] = {}
+    for event in timeline:
+        cat_id = str(event.get("catId") or "").strip()
+        cat_name = str(event.get("catName") or "").strip()
+        if not cat_id or not cat_name:
+            continue
+        by_id.setdefault(cat_id, {"id": cat_id, "name": cat_name})
+    return sorted(by_id.values(), key=lambda item: item["name"].lower())
+
+
+def detect_cat_in_text(text: str, cats: list[dict]) -> dict | None:
+    lowered = text.lower()
+    for cat in cats:
+        name = cat["name"].lower()
+        if re.search(rf"\b{re.escape(name)}\b", lowered):
+            return cat
+    return None
+
+
+def detect_cat_in_history(history: list[dict], cats: list[dict], current_question: str) -> dict | None:
+    current = current_question.strip()
+    skipped_current = False
+    for message in reversed(history):
+        text = str(message.get("text") or "").strip()
+        if not skipped_current and text == current:
+            skipped_current = True
+            continue
+        cat = detect_cat_in_text(text, cats)
+        if cat:
+            return cat
+    return None
+
+
+def uses_contextual_reference(question: str) -> bool:
+    words = set(re.findall(r"[a-z0-9]+", question.lower()))
+    return bool(words & SINGULAR_CAT_REFERENCES)
+
+
+def should_ask_which_cat(question: str, cats: list[dict]) -> bool:
+    if len(cats) <= 1:
+        return False
+    words = set(re.findall(r"[a-z0-9]+", question.lower()))
+    if words & HOUSEHOLD_TERMS:
+        return False
+    return bool((words & CAT_SPECIFIC_TERMS) or (words & SINGULAR_CAT_REFERENCES))
+
+
+def clarification_text(cats: list[dict]) -> str:
+    names = [cat["name"] for cat in cats]
+    if not names:
+        return "Which cat are you asking about?"
+    if len(names) == 1:
+        return f"Do you mean {names[0]}?"
+    return f"Which cat do you mean: {', '.join(names[:-1])}, or {names[-1]}?"

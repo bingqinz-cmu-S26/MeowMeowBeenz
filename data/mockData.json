@@ -1,79 +1,74 @@
 {
-  "version": 1,
-  "description": "Placeholder/MVP data. Each cat has a timeline of events; each event is { mood, action, timestamp, confidence } with an optional description. confidence is required on every event.",
+  "version": 2,
+  "description": "Realistic demo data for the first three app tabs. The cats[].timeline array stays mood-centric for backend retrieval; app.cats and app.events mirror the Swift API models for bundled fallback data.",
   "moods": [
     {
       "id": "content",
       "label": "Content",
-      "summary": "Relaxed / happy"
+      "summary": "Relaxed and comfortable"
     },
     {
       "id": "affectionate",
       "label": "Affectionate",
-      "summary": "Seeking closeness / bonding"
+      "summary": "Seeking closeness or social contact"
     },
     {
       "id": "soliciting",
       "label": "Soliciting",
-      "summary": "Wants something / food",
-      "tags": ["hunger"]
+      "summary": "Requesting food, attention, access, or routine help",
+      "tags": ["hunger", "request"]
     },
     {
       "id": "playful",
       "label": "Hunting / Playful",
-      "summary": "Excited / stalking"
+      "summary": "Engaged in enrichment, stalking, chasing, or play"
     },
     {
       "id": "curious",
       "label": "Curious / Alert",
-      "summary": "Investigating, attentive"
+      "summary": "Investigating or attending to a stimulus"
     },
     {
       "id": "restless",
       "label": "Restless / Frustrated",
-      "summary": "Blocked from a goal, pacing"
+      "summary": "Pacing, blocked from a goal, or unsettled"
     },
     {
       "id": "agitated",
       "label": "Agitated / Defensive",
-      "summary": "\"Back off\" — annoyed or threatened"
+      "summary": "Annoyed, warning, or reacting defensively"
     },
     {
       "id": "fearful",
       "label": "Fearful / Anxious",
-      "summary": "Scared, hiding, wary"
+      "summary": "Hiding, retreating, or wary after a stressor"
     },
     {
       "id": "distress",
       "label": "Distress",
-      "summary": "Something's wrong, possibly pain",
-      "tags": ["pain"]
+      "summary": "Higher-intensity vocalization or behavior that deserves review",
+      "tags": ["pain", "review"]
     },
     {
       "id": "discomfort",
       "label": "Physical Discomfort",
-      "summary": "Aching or sore, low-grade pain",
-      "tags": ["pain"]
+      "summary": "Possible soreness, irritation, or low-grade pain",
+      "tags": ["pain", "watch"]
     },
     {
       "id": "territorial",
       "label": "Territorial / Warning",
-      "summary": "Guarding space, warning off another cat"
-    },
-    {
-      "id": "mating",
-      "label": "Mating Call / In Heat",
-      "summary": "Calling for a mate"
+      "summary": "Guarding space or warning another cat away"
     },
     {
       "id": "grooming",
       "label": "Grooming",
-      "summary": "Self-care, licking, scratching"
+      "summary": "Self-care, licking, scratching, or focused coat attention"
     },
     {
       "id": "sleepy",
       "label": "Sleepy / Resting",
-      "summary": "Drowsy, dozing, low energy"
+      "summary": "Drowsy, resting, or low-energy behavior"
     }
   ],
   "cats": [
@@ -82,109 +77,123 @@
       "name": "Luna",
       "breed": "Domestic Shorthair",
       "ageYears": 4,
+      "device": "Kitchen camera",
+      "accent": "#66d19e",
       "timeline": [
         {
           "mood": "sleepy",
           "action": "curled up on the windowsill",
           "timestamp": "2026-06-07T06:40:00Z",
           "confidence": 0.88,
-          "description": "Slow soft purr, eyes half closed in the early light."
+          "description": "Slow breathing and half-closed eyes in the morning light."
         },
         {
           "mood": "soliciting",
           "action": "pacing by the food bowl",
-          "timestamp": "2026-06-07T07:55:00Z",
-          "confidence": 0.81,
-          "description": "Repeated short meows toward the kitchen, clearly asking for breakfast."
+          "timestamp": "2026-06-07T07:52:00Z",
+          "confidence": 0.83,
+          "description": "Repeated short meows toward the kitchen before breakfast."
         },
         {
           "mood": "content",
-          "action": "eating",
+          "action": "eating breakfast",
           "timestamp": "2026-06-07T08:05:00Z",
-          "confidence": 0.9,
-          "description": "Steady posture at the bowl, faint purring between bites."
+          "confidence": 0.91,
+          "description": "Steady posture at the bowl, no guarding or hesitation."
         },
         {
           "mood": "grooming",
           "action": "licking paws after the meal",
-          "timestamp": "2026-06-07T08:20:00Z",
-          "confidence": 0.84
+          "timestamp": "2026-06-07T08:22:00Z",
+          "confidence": 0.84,
+          "description": "Normal post-meal grooming with relaxed body posture."
         },
         {
           "mood": "playful",
           "action": "stalking a toy mouse",
-          "timestamp": "2026-06-07T11:30:00Z",
-          "confidence": 0.79,
-          "description": "Chattering at the toy, crouched and wiggling before a pounce."
+          "timestamp": "2026-06-07T11:34:00Z",
+          "confidence": 0.8,
+          "description": "Crouched, tail twitching, then a short pounce."
         },
         {
           "mood": "curious",
           "action": "watching birds at the window",
-          "timestamp": "2026-06-07T15:05:00Z",
-          "confidence": 0.66
+          "timestamp": "2026-06-07T15:08:00Z",
+          "confidence": 0.69,
+          "description": "Quiet, alert posture with ears forward."
         },
         {
           "mood": "restless",
-          "action": "scratching at a closed door",
-          "timestamp": "2026-06-07T19:10:00Z",
-          "confidence": 0.72,
-          "description": "Short sharp meows, wants access to the bedroom."
+          "action": "scratching at a closed bedroom door",
+          "timestamp": "2026-06-07T19:14:00Z",
+          "confidence": 0.74,
+          "description": "Short sharp meows and repeated pawing when access was blocked."
         },
         {
           "mood": "distress",
-          "action": "lying still but vocalizing",
+          "action": "lying still but vocalizing overnight",
           "timestamp": "2026-06-07T23:45:00Z",
-          "confidence": 0.61,
-          "description": "A high-intensity night yowl while otherwise inactive — worth watching for repeats."
+          "confidence": 0.64,
+          "description": "High-intensity night yowl while otherwise inactive; worth checking if it repeats."
         }
       ]
     },
     {
       "id": "milo",
       "name": "Milo",
-      "breed": "Tabby mix",
+      "breed": "Brown tabby mix",
       "ageYears": 2,
+      "device": "Living room camera",
+      "accent": "#e4bd5b",
       "timeline": [
         {
           "mood": "affectionate",
           "action": "head-butting and rubbing against legs",
           "timestamp": "2026-06-07T07:10:00Z",
           "confidence": 0.86,
-          "description": "Trilling and weaving figure-eights, a warm morning greeting."
+          "description": "Trilling and weaving figure-eights around the owner."
         },
         {
           "mood": "content",
           "action": "sunbathing on the couch",
           "timestamp": "2026-06-07T09:30:00Z",
           "confidence": 0.89,
-          "description": "Stretched out, slow blinks, steady purr."
+          "description": "Stretched out, slow blinking, and relaxed tail."
+        },
+        {
+          "mood": "playful",
+          "action": "chasing a feather wand",
+          "timestamp": "2026-06-07T12:42:00Z",
+          "confidence": 0.87,
+          "description": "Short chirps during normal high-energy play."
         },
         {
           "mood": "agitated",
-          "action": "facing off with the other cat",
+          "action": "facing off near the sunny chair",
           "timestamp": "2026-06-07T14:15:00Z",
           "confidence": 0.77,
-          "description": "Low growl and a brief hiss over a contested sunny spot."
+          "description": "Low growl and one brief hiss when Luna approached the chair."
         },
         {
           "mood": "fearful",
-          "action": "hiding under the bed",
+          "action": "hiding under the bed after the doorbell",
           "timestamp": "2026-06-07T16:00:00Z",
           "confidence": 0.7,
-          "description": "Retreated and went quiet after the doorbell rang."
+          "description": "Retreated quickly and stayed quiet for several minutes."
         },
         {
           "mood": "soliciting",
           "action": "sitting by the treat cupboard",
           "timestamp": "2026-06-07T18:25:00Z",
           "confidence": 0.8,
-          "description": "Insistent meows aimed directly at the owner."
+          "description": "Insistent meows directed at the owner before the usual treat time."
         },
         {
           "mood": "sleepy",
           "action": "dozing on a lap",
           "timestamp": "2026-06-07T21:40:00Z",
-          "confidence": 0.85
+          "confidence": 0.85,
+          "description": "Relaxed, warm body posture and intermittent purring."
         }
       ]
     },
@@ -193,42 +202,427 @@
       "name": "Saffron",
       "breed": "Maine Coon",
       "ageYears": 8,
+      "device": "Hallway camera",
+      "accent": "#76c7d8",
       "timeline": [
         {
           "mood": "discomfort",
           "action": "moving stiffly off the cat tree",
           "timestamp": "2026-06-07T08:50:00Z",
-          "confidence": 0.64,
-          "description": "A soft cry on the jump down; possible joint soreness in an older cat."
+          "confidence": 0.66,
+          "description": "Soft cry on the jump down; possible joint soreness in an older cat."
         },
         {
           "mood": "grooming",
           "action": "over-licking one hind leg",
           "timestamp": "2026-06-07T10:05:00Z",
           "confidence": 0.68,
-          "description": "Focused, repeated grooming of the same spot — inspect skin if it continues."
+          "description": "Focused, repeated grooming of the same spot."
         },
         {
           "mood": "territorial",
           "action": "guarding the hallway",
           "timestamp": "2026-06-07T13:20:00Z",
           "confidence": 0.73,
-          "description": "Low chatter and a warning yowl as another cat approached."
+          "description": "Low chatter and a warning yowl as Milo approached."
         },
         {
           "mood": "content",
           "action": "resting in the cat bed",
           "timestamp": "2026-06-07T17:30:00Z",
           "confidence": 0.87,
-          "description": "Calm and quiet, occasional purr."
+          "description": "Calm and quiet, with occasional purring."
         },
         {
           "mood": "curious",
           "action": "inspecting a new package",
           "timestamp": "2026-06-07T18:40:00Z",
-          "confidence": 0.62
+          "confidence": 0.62,
+          "description": "Sniffing and circling the box with relaxed posture."
+        },
+        {
+          "mood": "grooming",
+          "action": "scratching behind the left ear",
+          "timestamp": "2026-06-07T20:18:00Z",
+          "confidence": 0.65,
+          "description": "Second focused grooming/scratching event today; inspect if persistent."
         }
       ]
     }
-  ]
+  ],
+  "app": {
+    "cats": [
+      {
+        "id": "luna",
+        "ownerId": null,
+        "ownerUsername": null,
+        "name": "Luna",
+        "initials": "LU",
+        "age": "4 yrs",
+        "birthDate": "2022-03-18",
+        "device": "Kitchen camera",
+        "accent": "#66d19e"
+      },
+      {
+        "id": "milo",
+        "ownerId": null,
+        "ownerUsername": null,
+        "name": "Milo",
+        "initials": "MI",
+        "age": "2 yrs",
+        "birthDate": "2024-04-02",
+        "device": "Living room camera",
+        "accent": "#e4bd5b"
+      },
+      {
+        "id": "saffron",
+        "ownerId": null,
+        "ownerUsername": null,
+        "name": "Saffron",
+        "initials": "SA",
+        "age": "8 yrs",
+        "birthDate": "2018-01-11",
+        "device": "Hallway camera",
+        "accent": "#76c7d8"
+      }
+    ],
+    "events": [
+      {
+        "id": "evt_luna_20260607_2345",
+        "catId": "luna",
+        "catName": "Luna",
+        "time": "2026-06-07T23:45:00Z",
+        "source": "mockData",
+        "state": "Lying still but vocalizing overnight",
+        "intent": "pain_or_discomfort",
+        "behaviorLabel": "inactive_lying.resting",
+        "soundType": "distress_like_yowl",
+        "confidence": 0.64,
+        "riskLevel": "review",
+        "signals": ["review_level_observation", "unusual_vocalization"],
+        "summary": "High-intensity night yowl while otherwise inactive; worth checking if it repeats.",
+        "suggestion": "Check Luna's posture, appetite, and litter behavior in the morning. If this repeats or pairs with lethargy, consider calling a vet."
+      },
+      {
+        "id": "evt_milo_20260607_2140",
+        "catId": "milo",
+        "catName": "Milo",
+        "time": "2026-06-07T21:40:00Z",
+        "source": "mockData",
+        "state": "Dozing on a lap",
+        "intent": "resting_or_low_energy",
+        "behaviorLabel": "inactive_lying.resting",
+        "soundType": "soft_purr",
+        "confidence": 0.85,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Relaxed, warm body posture and intermittent purring.",
+        "suggestion": "This fits Milo's normal evening wind-down pattern."
+      },
+      {
+        "id": "evt_saffron_20260607_2018",
+        "catId": "saffron",
+        "catName": "Saffron",
+        "time": "2026-06-07T20:18:00Z",
+        "source": "mockData",
+        "state": "Scratching behind the left ear",
+        "intent": "self_care_or_discomfort",
+        "behaviorLabel": "maintenance_scratching",
+        "soundType": "quiet",
+        "confidence": 0.65,
+        "riskLevel": "watch",
+        "signals": ["possible_skin_ear_discomfort"],
+        "summary": "Second focused grooming/scratching event today; inspect if persistent.",
+        "suggestion": "Check the left ear and nearby skin for redness, debris, or repeated attention."
+      },
+      {
+        "id": "evt_luna_20260607_1914",
+        "catId": "luna",
+        "catName": "Luna",
+        "time": "2026-06-07T19:14:00Z",
+        "source": "mockData",
+        "state": "Scratching at a closed bedroom door",
+        "intent": "activity_change",
+        "behaviorLabel": "active_walking",
+        "soundType": "short_meow",
+        "confidence": 0.74,
+        "riskLevel": "watch",
+        "signals": [],
+        "summary": "Short sharp meows and repeated pawing when access was blocked.",
+        "suggestion": "This looks access-related. Watch for pacing when doors are open too."
+      },
+      {
+        "id": "evt_saffron_20260607_1840",
+        "catId": "saffron",
+        "catName": "Saffron",
+        "time": "2026-06-07T18:40:00Z",
+        "source": "mockData",
+        "state": "Inspecting a new package",
+        "intent": "curious_exploration",
+        "behaviorLabel": "active_walking",
+        "soundType": "quiet",
+        "confidence": 0.62,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Sniffing and circling the box with relaxed posture.",
+        "suggestion": "Normal exploratory behavior after a new object entered the hallway."
+      },
+      {
+        "id": "evt_milo_20260607_1825",
+        "catId": "milo",
+        "catName": "Milo",
+        "time": "2026-06-07T18:25:00Z",
+        "source": "mockData",
+        "state": "Sitting by the treat cupboard",
+        "intent": "food_seeking",
+        "behaviorLabel": "inactive_lying.resting",
+        "soundType": "repeated_meow",
+        "confidence": 0.8,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Insistent meows directed at the owner before the usual treat time.",
+        "suggestion": "Routine food-seeking pattern; note only if appetite changes outside normal timing."
+      },
+      {
+        "id": "evt_saffron_20260607_1730",
+        "catId": "saffron",
+        "catName": "Saffron",
+        "time": "2026-06-07T17:30:00Z",
+        "source": "mockData",
+        "state": "Resting in the cat bed",
+        "intent": "resting_or_low_energy",
+        "behaviorLabel": "inactive_lying.resting",
+        "soundType": "soft_purr",
+        "confidence": 0.87,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Calm and quiet, with occasional purring.",
+        "suggestion": "Comfortable resting behavior after an active afternoon."
+      },
+      {
+        "id": "evt_milo_20260607_1600",
+        "catId": "milo",
+        "catName": "Milo",
+        "time": "2026-06-07T16:00:00Z",
+        "source": "mockData",
+        "state": "Hiding under the bed after the doorbell",
+        "intent": "anxious_shift",
+        "behaviorLabel": "inactive_lying.hiding",
+        "soundType": "quiet",
+        "confidence": 0.7,
+        "riskLevel": "watch",
+        "signals": [],
+        "summary": "Retreated quickly and stayed quiet for several minutes.",
+        "suggestion": "Likely stressor-related. Let Milo re-emerge on his own and watch for recovery time."
+      },
+      {
+        "id": "evt_luna_20260607_1508",
+        "catId": "luna",
+        "catName": "Luna",
+        "time": "2026-06-07T15:08:00Z",
+        "source": "mockData",
+        "state": "Watching birds at the window",
+        "intent": "curious_exploration",
+        "behaviorLabel": "active_walking",
+        "soundType": "quiet",
+        "confidence": 0.69,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Quiet, alert posture with ears forward.",
+        "suggestion": "Normal enrichment from window watching."
+      },
+      {
+        "id": "evt_milo_20260607_1415",
+        "catId": "milo",
+        "catName": "Milo",
+        "time": "2026-06-07T14:15:00Z",
+        "source": "mockData",
+        "state": "Facing off near the sunny chair",
+        "intent": "defensive_behavior",
+        "behaviorLabel": "active_walking",
+        "soundType": "yowl",
+        "confidence": 0.77,
+        "riskLevel": "watch",
+        "signals": ["unusual_vocalization"],
+        "summary": "Low growl and one brief hiss when Luna approached the chair.",
+        "suggestion": "Give the cats more than one sunny resting option and watch whether resource tension repeats."
+      },
+      {
+        "id": "evt_saffron_20260607_1320",
+        "catId": "saffron",
+        "catName": "Saffron",
+        "time": "2026-06-07T13:20:00Z",
+        "source": "mockData",
+        "state": "Guarding the hallway",
+        "intent": "territorial_warning",
+        "behaviorLabel": "active_walking",
+        "soundType": "yowl",
+        "confidence": 0.73,
+        "riskLevel": "watch",
+        "signals": [],
+        "summary": "Low chatter and a warning yowl as Milo approached.",
+        "suggestion": "Watch for repeated hallway blocking and add another route if it becomes frequent."
+      },
+      {
+        "id": "evt_milo_20260607_1242",
+        "catId": "milo",
+        "catName": "Milo",
+        "time": "2026-06-07T12:42:00Z",
+        "source": "mockData",
+        "state": "Chasing a feather wand",
+        "intent": "play_or_social_engagement",
+        "behaviorLabel": "active_playfight.playing",
+        "soundType": "chirp",
+        "confidence": 0.87,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Short chirps during normal high-energy play.",
+        "suggestion": "Good enrichment. End play with a small food reward if this is part of the routine."
+      },
+      {
+        "id": "evt_luna_20260607_1134",
+        "catId": "luna",
+        "catName": "Luna",
+        "time": "2026-06-07T11:34:00Z",
+        "source": "mockData",
+        "state": "Stalking a toy mouse",
+        "intent": "play_or_social_engagement",
+        "behaviorLabel": "active_playfight.playing",
+        "soundType": "chirp",
+        "confidence": 0.8,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Crouched, tail twitching, then a short pounce.",
+        "suggestion": "Normal play sequence and a useful activity marker."
+      },
+      {
+        "id": "evt_saffron_20260607_1005",
+        "catId": "saffron",
+        "catName": "Saffron",
+        "time": "2026-06-07T10:05:00Z",
+        "source": "mockData",
+        "state": "Over-licking one hind leg",
+        "intent": "self_care_or_discomfort",
+        "behaviorLabel": "maintenance_grooming",
+        "soundType": "quiet",
+        "confidence": 0.68,
+        "riskLevel": "watch",
+        "signals": ["possible_skin_ear_discomfort"],
+        "summary": "Focused, repeated grooming of the same spot.",
+        "suggestion": "Inspect the hind leg if grooming remains focused there tomorrow."
+      },
+      {
+        "id": "evt_milo_20260607_0930",
+        "catId": "milo",
+        "catName": "Milo",
+        "time": "2026-06-07T09:30:00Z",
+        "source": "mockData",
+        "state": "Sunbathing on the couch",
+        "intent": "resting_or_low_energy",
+        "behaviorLabel": "inactive_lying.resting",
+        "soundType": "soft_purr",
+        "confidence": 0.89,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Stretched out, slow blinking, and relaxed tail.",
+        "suggestion": "Normal relaxed resting behavior."
+      },
+      {
+        "id": "evt_saffron_20260607_0850",
+        "catId": "saffron",
+        "catName": "Saffron",
+        "time": "2026-06-07T08:50:00Z",
+        "source": "mockData",
+        "state": "Moving stiffly off the cat tree",
+        "intent": "pain_or_discomfort",
+        "behaviorLabel": "active_walking",
+        "soundType": "distress_like_yowl",
+        "confidence": 0.66,
+        "riskLevel": "review",
+        "signals": ["review_level_observation"],
+        "summary": "Soft cry on the jump down; possible joint soreness in an older cat.",
+        "suggestion": "Watch jumps and landings today. Consider lowering access points if stiffness repeats."
+      },
+      {
+        "id": "evt_luna_20260607_0822",
+        "catId": "luna",
+        "catName": "Luna",
+        "time": "2026-06-07T08:22:00Z",
+        "source": "mockData",
+        "state": "Licking paws after the meal",
+        "intent": "self_care_or_discomfort",
+        "behaviorLabel": "maintenance_grooming",
+        "soundType": "quiet",
+        "confidence": 0.84,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Normal post-meal grooming with relaxed body posture.",
+        "suggestion": "No concern; this is expected self-care after eating."
+      },
+      {
+        "id": "evt_luna_20260607_0805",
+        "catId": "luna",
+        "catName": "Luna",
+        "time": "2026-06-07T08:05:00Z",
+        "source": "mockData",
+        "state": "Eating breakfast",
+        "intent": "food_seeking",
+        "behaviorLabel": "maintenance_nutrition.eating",
+        "soundType": "quiet",
+        "confidence": 0.91,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Steady posture at the bowl, no guarding or hesitation.",
+        "suggestion": "Normal appetite marker for the morning."
+      },
+      {
+        "id": "evt_luna_20260607_0752",
+        "catId": "luna",
+        "catName": "Luna",
+        "time": "2026-06-07T07:52:00Z",
+        "source": "mockData",
+        "state": "Pacing by the food bowl",
+        "intent": "food_seeking",
+        "behaviorLabel": "active_walking",
+        "soundType": "repeated_meow",
+        "confidence": 0.83,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Repeated short meows toward the kitchen before breakfast.",
+        "suggestion": "Routine pre-meal request; compare timing if appetite changes later."
+      },
+      {
+        "id": "evt_milo_20260607_0710",
+        "catId": "milo",
+        "catName": "Milo",
+        "time": "2026-06-07T07:10:00Z",
+        "source": "mockData",
+        "state": "Head-butting and rubbing against legs",
+        "intent": "social_bonding",
+        "behaviorLabel": "active_walking",
+        "soundType": "soft_purr",
+        "confidence": 0.86,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Trilling and weaving figure-eights around the owner.",
+        "suggestion": "Normal affectionate morning greeting."
+      },
+      {
+        "id": "evt_luna_20260607_0640",
+        "catId": "luna",
+        "catName": "Luna",
+        "time": "2026-06-07T06:40:00Z",
+        "source": "mockData",
+        "state": "Curled up on the windowsill",
+        "intent": "resting_or_low_energy",
+        "behaviorLabel": "inactive_lying.resting",
+        "soundType": "quiet",
+        "confidence": 0.88,
+        "riskLevel": "normal",
+        "signals": [],
+        "summary": "Slow breathing and half-closed eyes in the morning light.",
+        "suggestion": "Normal early-morning resting behavior."
+      }
+    ]
+  }
 }

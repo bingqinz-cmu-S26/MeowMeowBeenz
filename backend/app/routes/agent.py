@@ -14,5 +14,6 @@ async def agent_chat(payload: AgentRequest):
 
     timeline = [event.model_dump() for event in payload.timeline]
     report = payload.report.model_dump() if hasattr(payload.report, "model_dump") else payload.report
-    result = ask_agent(question, timeline, report if isinstance(report, dict) else None)
+    history = [message.model_dump() for message in payload.history]
+    result = ask_agent(question, timeline, report if isinstance(report, dict) else None, history=history)
     return {"ok": True, "answer": result["text"], "provider": result["provider"]}

@@ -137,6 +137,47 @@ struct SoftChip: View {
     }
 }
 
+struct CatSelector: View {
+    @Environment(AppModel.self) private var app
+
+    private var selection: Binding<String> {
+        Binding(
+            get: { app.selectedCatId ?? app.cats.first?.id ?? "" },
+            set: { newValue in Task { await app.selectCat(newValue) } }
+        )
+    }
+
+    var body: some View {
+        SoftCard(
+            title: "Cat",
+            subtitle: app.selectedCat.map { "\($0.name) · \($0.age)" } ?? "Select a tracked cat",
+            icon: "cat",
+            accent: .pink
+        ) {
+            if app.cats.isEmpty {
+                Label("No cats available", systemImage: "exclamationmark.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if app.cats.count <= 3 {
+                Picker("Cat", selection: selection) {
+                    ForEach(app.cats) { cat in
+                        Text(cat.name).tag(cat.id)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } else {
+                Picker("Cat", selection: selection) {
+                    ForEach(app.cats) { cat in
+                        Text(cat.name).tag(cat.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
 // Hex color helper for accent strings from backend payloads.
 extension Color {
     init(hex: String) {

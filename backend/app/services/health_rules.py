@@ -25,13 +25,21 @@ SIGNAL_COPY = {
         "title": "Audio-video mismatch",
         "suggestion": "Review the moment manually. Conflicting signals should be treated as uncertain, not diagnostic.",
     },
+    "review_level_observation": {
+        "title": "Possible discomfort",
+        "suggestion": "Check the recent clip and keep an eye on whether this repeats or combines with other symptoms.",
+    },
+    "watch_level_observation": {
+        "title": "Behavior change",
+        "suggestion": "Check the environment and keep watching whether this repeats or escalates.",
+    },
 }
 
 
 def build_range_report(events: list[dict], range_name: str = "day") -> dict:
     scoped = filter_by_range(events, range_name)
     counts = count_events(scoped)
-    alerts = alerts_from_event_signals(scoped) + alerts_from_behavior_mix(scoped, counts)
+    alerts = alerts_from_event_signals(scoped) + alerts_from_risk_events(scoped) + alerts_from_behavior_mix(scoped, counts)
     deduped = dedupe_alerts(alerts)
     overall = choose_overall_level(deduped)
     return {
@@ -111,6 +119,23 @@ def alerts_from_event_signals(events: list[dict]) -> list[dict]:
     return alerts
 
 
+def alerts_from_risk_events(events: list[dict]) -> list[dict]:
+    alerts = []
+    for event in events:
+        risk = event.get("riskLevel")
+        if risk not in {"watch", "review"}:
+            continue
+        cat_name = str(event.get("catName") or "Cat").strip()
+        state = str(event.get("state") or "behavior change").strip()
+        summary = str(event.get("summary") or "").strip()
+        evidence = f"{cat_name}: {state}"
+        if summary:
+            evidence = f"{evidence} — {summary}"
+        signal = "review_level_observation" if risk == "review" else "watch_level_observation"
+        alerts.append(create_alert(signal, [evidence], float(event.get("confidence", 0))))
+    return alerts
+
+
 def alerts_from_behavior_mix(events: list[dict], counts: dict) -> list[dict]:
     if not events:
         return []
@@ -160,7 +185,7 @@ def create_alert(signal: str, evidence: list[str], confidence: float) -> dict:
     )
     return {
         "signal": signal,
-        "level": "review" if signal == "multimodal_conflict" else "watch",
+        "level": "review" if signal in {"multimodal_conflict", "review_level_observation"} else "watch",
         "title": copy["title"],
         "evidence": evidence,
         "suggestion": copy["suggestion"],

@@ -16,6 +16,8 @@ struct CatProfile: Codable, Identifiable, Hashable {
 
 struct TimelineEvent: Codable, Identifiable, Hashable {
     let id: String
+    let catId: String?
+    let catName: String?
     let time: String
     let source: String
     let state: String
@@ -99,6 +101,11 @@ struct ChatMessage: Identifiable, Hashable {
     let role: Role
     let text: String
     var provider: String?
+}
+
+struct AgentHistoryMessage: Codable, Hashable {
+    let role: String
+    let text: String
 }
 
 // MARK: - Response envelopes

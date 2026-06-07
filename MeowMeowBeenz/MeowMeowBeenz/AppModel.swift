@@ -19,8 +19,13 @@ final class AppModel {
 
     // Data
     var cats: [CatProfile] = []
+    var selectedCatId: String? {
+        didSet { UserDefaults.standard.set(selectedCatId, forKey: "selectedCatId") }
+    }
     var events: [TimelineEvent] = []
     var report: HealthReport?
+    var householdEvents: [TimelineEvent] = []
+    var householdReport: HealthReport?
     var reportRange: ReportRange = .day
 
     // Chat
@@ -37,6 +42,9 @@ final class AppModel {
     var isLoading = false
     var errorMessage: String?
 
+    private let mockData = MockDataStore.load()
+    let usesMockData = true
+
     var isSignedIn: Bool { token != nil && user != nil }
 
     private var client: APIClient {
@@ -46,6 +54,7 @@ final class AppModel {
     init() {
         self.baseURLString = UserDefaults.standard.string(forKey: "baseURL") ?? "http://localhost:8000"
         self.token = UserDefaults.standard.string(forKey: "token")
+        self.selectedCatId = UserDefaults.standard.string(forKey: "selectedCatId")
     }
 
     // MARK: Lifecycle
@@ -54,10 +63,10 @@ final class AppModel {
         isLoading = true
         defer { isLoading = false }
         await refreshAPIStatus()
-        await loadTimelineAndReport()
         if token != nil {
             await restoreSession()
         }
+        applyMockData(catId: selectedCatId, range: reportRange)
     }
 
     func refreshAPIStatus() async {
@@ -76,15 +85,17 @@ final class AppModel {
     }
 
     func loadTimelineAndReport() async {
-        async let events = try? client.events()
-        async let report = try? client.report(range: reportRange)
-        self.events = await events ?? []
-        self.report = await report
+        applyMockData(catId: selectedCatId, range: reportRange)
     }
 
     func changeRange(_ range: ReportRange) async {
         reportRange = range
-        report = try? await client.report(range: range)
+        applyMockReports(range: range)
+    }
+
+    func selectCat(_ catId: String) async {
+        selectedCatId = catId
+        await loadTimelineAndReport()
     }
 
     // MARK: Auth
@@ -92,12 +103,12 @@ final class AppModel {
     func restoreSession() async {
         do {
             user = try await client.me()
-            cats = (try? await client.cats()) ?? []
         } catch {
             // Token invalid/expired — clear it silently.
             token = nil
             user = nil
         }
+        applyMockData(catId: selectedCatId, range: reportRange)
     }
 
     func signIn(username: String, password: String, isRegister: Bool) async {
@@ -108,7 +119,7 @@ final class AppModel {
                 : try await client.login(username: username, password: password)
             token = auth.token
             user = auth.user
-            cats = (try? await client.cats()) ?? []
+            applyMockData(catId: selectedCatId, range: reportRange)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -117,13 +128,14 @@ final class AppModel {
     func signOut() {
         token = nil
         user = nil
-        cats = []
+        applyMockData(catId: selectedCatId, range: reportRange)
     }
 
     func addCat(name: String, birthDate: String, device: String?) async -> Bool {
         do {
             let cat = try await client.createCat(name: name, birthDate: birthDate, device: device)
             cats.append(cat)
+            ensureSelectedCat()
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -135,22 +147,19 @@ final class AppModel {
 
     func analyzeNow() async {
         if let event = try? await client.addScenario("live") {
-            events.insert(event, at: 0)
-            report = try? await client.report(range: reportRange)
+            insertVisibleEvent(event)
+            await refreshReports()
         }
     }
 
     func loadDemoDay() async {
-        if let seeded = try? await client.seedEvents() {
-            events = seeded
-            report = try? await client.report(range: reportRange)
-        }
+        applyMockData(catId: selectedCatId, range: reportRange)
     }
 
     func injectScenario(_ type: String) async {
         if let event = try? await client.addScenario(type) {
-            events.insert(event, at: 0)
-            report = try? await client.report(range: reportRange)
+            insertVisibleEvent(event)
+            await refreshReports()
         }
     }
 
@@ -160,10 +169,23 @@ final class AppModel {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         chat.append(ChatMessage(role: .owner, text: trimmed))
+        let history = chat.suffix(10).map { message in
+            AgentHistoryMessage(
+                role: message.role == .owner ? "owner" : "assistant",
+                text: message.text
+            )
+        }
         isSending = true
         defer { isSending = false }
         do {
-            let answer = try await client.ask(question: trimmed, timeline: events, report: report)
+            let timeline = householdEvents.isEmpty ? events : householdEvents
+            let reportContext = householdReport ?? report
+            let answer = try await client.ask(
+                question: trimmed,
+                timeline: timeline,
+                report: reportContext,
+                history: Array(history)
+            )
             chat.append(ChatMessage(role: .assistant, text: answer.answer, provider: answer.provider))
         } catch {
             chat.append(ChatMessage(role: .assistant,
@@ -189,8 +211,8 @@ final class AppModel {
                 return nil
             }
             if let event = result.event ?? result.analysis {
-                events.insert(event, at: 0)
-                report = try? await client.report(range: reportRange)
+                insertVisibleEvent(event)
+                await refreshReports()
             }
             errorMessage = nil
             return result
@@ -212,5 +234,68 @@ final class AppModel {
 
     var latestEvent: TimelineEvent? { events.first }
 
+    var latestHouseholdEvent: TimelineEvent? { householdEvents.first }
+
     var overallLevel: String { report?.overall ?? "normal" }
+
+    var householdOverallLevel: String { householdReport?.overall ?? overallLevel }
+
+    var selectedCat: CatProfile? {
+        cats.first { $0.id == selectedCatId } ?? cats.first
+    }
+
+    private func ensureSelectedCat() {
+        guard !cats.isEmpty else {
+            selectedCatId = nil
+            return
+        }
+        if let selectedCatId, cats.contains(where: { $0.id == selectedCatId }) {
+            return
+        }
+        selectedCatId = cats[0].id
+    }
+
+    private func insertVisibleEvent(_ event: TimelineEvent) {
+        householdEvents.insert(event, at: 0)
+        if event.catId == nil || event.catId == selectedCatId {
+            events.insert(event, at: 0)
+        }
+    }
+
+    private func refreshReports() async {
+        async let selectedReport = try? client.report(range: reportRange, catId: selectedCatId)
+        async let householdReport = try? client.report(range: reportRange)
+        let loadedSelectedReport = await selectedReport
+        let loadedHouseholdReport = await householdReport
+        if loadedSelectedReport == nil || loadedHouseholdReport == nil {
+            applyMockReports(range: reportRange)
+        }
+        if let loadedSelectedReport {
+            self.report = loadedSelectedReport
+        }
+        if let loadedHouseholdReport {
+            self.householdReport = loadedHouseholdReport
+        }
+    }
+
+    private func applyMockData(catId: String?, range: ReportRange) {
+        guard let mockData else { return }
+        cats = mockData.cats
+        ensureSelectedCat()
+        householdEvents = mockData.events
+        events = eventsForSelectedCat(from: mockData.events, catId: catId ?? selectedCatId)
+        applyMockReports(range: range)
+    }
+
+    private func applyMockReports(range: ReportRange) {
+        let timeline = householdEvents.isEmpty ? mockData?.events ?? [] : householdEvents
+        let selectedTimeline = events.isEmpty ? eventsForSelectedCat(from: timeline, catId: selectedCatId) : events
+        householdReport = MockDataStore.report(for: timeline, range: range)
+        report = MockDataStore.report(for: selectedTimeline, range: range)
+    }
+
+    private func eventsForSelectedCat(from events: [TimelineEvent], catId: String?) -> [TimelineEvent] {
+        guard let catId, !catId.isEmpty else { return events }
+        return events.filter { $0.catId == catId }
+    }
 }
