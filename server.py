@@ -12,7 +12,8 @@ from urllib.request import Request, urlopen
 
 
 MINIMAX_DEFAULT_URL = "https://api.minimax.io/v1/chat/completions"
-MINIMAX_DEFAULT_MODEL = "MiniMax-M3"
+MINIMAX_DEFAULT_MODEL = "M2-her"
+MINIMAX_TIMEOUT_SECONDS = 12
 
 
 class AppHandler(SimpleHTTPRequestHandler):
@@ -158,9 +159,9 @@ def call_minimax(payload):
     model = os.environ.get("MINIMAX_MODEL", MINIMAX_DEFAULT_MODEL)
     body = {
         "model": model,
-        "messages": build_messages(question, timeline[-24:], report),
-        "temperature": 0.35,
-        "max_tokens": 700,
+        "messages": build_messages(question, timeline[-10:], report),
+        "temperature": 0.2,
+        "max_tokens": 260,
         "stream": False,
     }
 
@@ -175,7 +176,7 @@ def call_minimax(payload):
     )
 
     try:
-        with urlopen(request, timeout=35) as response:
+        with urlopen(request, timeout=MINIMAX_TIMEOUT_SECONDS) as response:
             data = json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
@@ -193,13 +194,15 @@ def call_minimax(payload):
 
 def build_messages(question, timeline, report):
     system = (
-        "You are Mochi Monitor's cat wellness assistant. "
-        "Answer the owner's question using only the provided timeline and daily report. "
+        "You are MeowMeowBeenz's cat wellness assistant. "
+        "Answer directly using only the provided timeline and daily report. "
+        "Do not deliberate, reason step-by-step, or explain your process. "
+        "Start with the answer. "
         "You may discuss behavior, intent, routine changes, and monitoring suggestions. "
         "Never diagnose disease or claim certainty. "
         "Do not include hidden reasoning, chain-of-thought, XML tags, markdown tables, or emoji. "
         "If risk is non-trivial, recommend observation, checking food/water/litter, reviewing clips, or contacting a vet if patterns persist. "
-        "Be concise, warm, and practical in 3-6 short sentences. Reply in the same language as the owner."
+        "Be concise, warm, and practical in 2-4 short sentences. Reply in the same language as the owner."
     )
     context = {
         "owner_question": question,
@@ -221,6 +224,6 @@ def clean_model_text(text):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "4173"))
     server = ThreadingHTTPServer(("", port), AppHandler)
-    print(f"Mochi Monitor serving on http://localhost:{port}")
+    print(f"MeowMeowBeenz serving on http://localhost:{port}")
     print(f"MiniMax model: {os.environ.get('MINIMAX_MODEL', MINIMAX_DEFAULT_MODEL)}")
     server.serve_forever()

@@ -18,7 +18,7 @@ export async function askAgent(question, timeline, report) {
   } catch (error) {
     return {
       provider: "local",
-      text: `${answerOwnerQuestion(question, timeline, report)}\n\nMiniMax fallback: ${error.message}`
+      text: `${answerOwnerQuestion(question, timeline, report)}\n\nMiniMax is taking too long, so Beenz used the local timeline summary.`
     };
   }
 }

@@ -26,28 +26,41 @@ const signalCopy = {
 };
 
 export function buildDailyReport(events) {
-  const todaysEvents = filterToday(events);
-  const counts = countEvents(todaysEvents);
+  return buildRangeReport(events, "day");
+}
+
+export function buildRangeReport(events, range = "day") {
+  const scopedEvents = filterByRange(events, range);
+  const counts = countEvents(scopedEvents);
   const alerts = [
-    ...alertsFromEventSignals(todaysEvents),
-    ...alertsFromBehaviorMix(todaysEvents, counts)
+    ...alertsFromEventSignals(scopedEvents),
+    ...alertsFromBehaviorMix(scopedEvents, counts)
   ];
   const dedupedAlerts = dedupeAlerts(alerts);
   const overall = chooseOverallLevel(dedupedAlerts);
 
   return {
-    dateLabel: new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }),
-    totalEvents: todaysEvents.length,
+    dateLabel: labelForRange(range),
+    range,
+    totalEvents: scopedEvents.length,
     counts,
     alerts: dedupedAlerts,
     overall,
-    summary: buildSummary(todaysEvents, dedupedAlerts, overall)
+    summary: buildSummary(scopedEvents, dedupedAlerts, overall)
   };
 }
 
-function filterToday(events) {
-  const today = new Date().toDateString();
-  return events.filter((event) => new Date(event.time).toDateString() === today);
+function filterByRange(events, range) {
+  const now = Date.now();
+  const days = range === "month" ? 30 : range === "week" ? 7 : 1;
+  const start = now - days * 24 * 60 * 60 * 1000;
+  return events.filter((event) => new Date(event.time).getTime() >= start);
+}
+
+function labelForRange(range) {
+  if (range === "month") return "Last 30 days";
+  if (range === "week") return "Last 7 days";
+  return new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 }
 
 function countEvents(events) {
