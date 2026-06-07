@@ -1,11 +1,10 @@
 {
-  "name": "mobile",
+  "name": "meowmeowbeenz",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
     "expo": "~56.0.9",
     "expo-constants": "~56.0.17",
-    "expo-font": "~56.0.5",
     "expo-linear-gradient": "^56.0.4",
     "expo-linking": "~56.0.13",
     "expo-router": "~56.2.9",
@@ -13,7 +12,6 @@
     "expo-splash-screen": "~56.0.10",
     "expo-status-bar": "~56.0.4",
     "expo-symbols": "~56.0.6",
-    "expo-web-browser": "~56.0.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
