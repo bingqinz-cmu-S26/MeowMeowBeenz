@@ -49,7 +49,15 @@ export default function HomeScreen() {
           {cats.length === 0 ? (
             <Text style={styles.empty}>No cats yet. Tap Add to create one.</Text>
           ) : (
-            cats.map((cat) => <CatCard key={cat.id} cat={cat} />)
+            cats.map((cat) => (
+              <CatCard
+                key={cat.id}
+                cat={cat}
+                onPress={() => router.push(`/cat/${cat.id}`)}
+                onEventsPress={() => router.push(`/cat/${cat.id}/events`)}
+                onAlertsPress={() => router.push(`/cat/${cat.id}/alerts`)}
+              />
+            ))
           )}
         </View>
       </Panel>

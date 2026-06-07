@@ -26,6 +26,12 @@ class CreateCatRequest(BaseModel):
     device: str | None = None
 
 
+class UpdateCatRequest(BaseModel):
+    name: str
+    birth_date: str
+    device: str | None = None
+
+
 class TimelineEvent(BaseModel):
     id: str
     time: str

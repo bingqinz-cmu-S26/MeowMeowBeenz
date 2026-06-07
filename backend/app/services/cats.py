@@ -87,6 +87,15 @@ def build_cat_document(
     }
 
 
+def build_cat_update(name: str, birth_date: date, device: str | None) -> dict:
+    return {
+        "name": name,
+        "birth_date": birth_date.isoformat(),
+        "device": device,
+        "initials": cat_initials(name),
+    }
+
+
 def public_cat(cat: dict) -> dict:
     birth = parse_birth_date(cat["birth_date"])
     return {

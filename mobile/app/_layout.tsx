@@ -31,6 +31,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="account" options={{ presentation: 'modal' }} />
           <Stack.Screen name="add-cat" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="cat/[id]" options={{ presentation: 'modal' }} />
         </Stack>
       </AppProvider>
     </AuthProvider>

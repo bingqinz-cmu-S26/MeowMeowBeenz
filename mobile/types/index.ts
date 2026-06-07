@@ -3,6 +3,8 @@ import type { RiskLevel } from '@/constants/Theme';
 export type ReportRange = 'day' | 'week' | 'month';
 export type ActivityFilter = 'all' | 'activity' | 'eating' | 'litter' | 'vocal' | 'warnings';
 
+export type CatStatus = 'nice' | 'perfect' | 'watch' | 'alert' | 'review';
+
 export type CatProfile = {
   id: string;
   ownerId?: string;
@@ -13,6 +15,11 @@ export type CatProfile = {
   birthDate: string;
   device?: string | null;
   accent: string;
+  status?: CatStatus;
+  room?: string;
+  routine?: string;
+  eventCount?: number;
+  alertCount?: number;
 };
 
 export type CreateCatInput = {
@@ -20,6 +27,8 @@ export type CreateCatInput = {
   birthDate: string;
   device?: string;
 };
+
+export type UpdateCatInput = CreateCatInput;
 
 export type TimelineEvent = {
   id: string;

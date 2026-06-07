@@ -1,7 +1,7 @@
 import { answerOwnerQuestion } from '@/lib/chatAgent';
 import { buildRangeReport } from '@/lib/healthRules';
 import { createScenarioEvent, createSeedEvents } from '@/lib/sampleData';
-import type { AuthUser, CatProfile, CreateCatInput, HealthReport, ReportRange, TimelineEvent } from '@/types';
+import type { AuthUser, CatProfile, CreateCatInput, HealthReport, ReportRange, TimelineEvent, UpdateCatInput } from '@/types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -77,6 +77,18 @@ export async function fetchCats(): Promise<CatProfile[]> {
 export async function createCat(input: CreateCatInput): Promise<CatProfile> {
   const data = await request<{ cat: CatProfile }>('/api/cats', {
     method: 'POST',
+    body: JSON.stringify({
+      name: input.name,
+      birth_date: input.birthDate,
+      device: input.device || null,
+    }),
+  });
+  return data.cat;
+}
+
+export async function updateCat(catId: string, input: UpdateCatInput): Promise<CatProfile> {
+  const data = await request<{ cat: CatProfile }>(`/api/cats/${catId}`, {
+    method: 'PUT',
     body: JSON.stringify({
       name: input.name,
       birth_date: input.birthDate,

@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import * as api from '@/lib/api';
 import { buildRangeReport } from '@/lib/healthRules';
 import { createSeedEvents } from '@/lib/sampleData';
-import type { ActivityFilter, CatProfile, ChatMessage, CreateCatInput, HealthReport, ReportRange, TimelineEvent } from '@/types';
+import type { ActivityFilter, CatProfile, ChatMessage, CreateCatInput, HealthReport, ReportRange, TimelineEvent, UpdateCatInput } from '@/types';
 
 type AppContextValue = {
   cats: CatProfile[];
@@ -24,6 +24,7 @@ type AppContextValue = {
   analyzeNow: () => Promise<void>;
   sendMessage: (question: string) => Promise<void>;
   addCat: (input: CreateCatInput) => Promise<void>;
+  updateCat: (catId: string, input: UpdateCatInput) => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -113,6 +114,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCats((current) => [...current, cat]);
   }, []);
 
+  const updateCat = useCallback(async (catId: string, input: UpdateCatInput) => {
+    const cat = await api.updateCat(catId, input);
+    setCats((current) => current.map((item) => (item.id === catId ? cat : item)));
+  }, []);
+
   const value = useMemo(
     () => ({
       cats,
@@ -132,6 +138,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       analyzeNow,
       sendMessage,
       addCat,
+      updateCat,
     }),
     [
       cats,
@@ -149,6 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       analyzeNow,
       sendMessage,
       addCat,
+      updateCat,
     ],
   );
 
