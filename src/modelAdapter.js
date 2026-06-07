@@ -1,4 +1,31 @@
-import { createScenarioEvent } from "./sampleData.js";
+import { createScenarioEvent, normalizeEvent } from "./sampleData.js";
+
+export async function analyzeUploadedClip(file) {
+  const form = new FormData();
+  form.append("clip", file);
+
+  const response = await fetch("/api/analyze-clip", {
+    method: "POST",
+    body: form
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || "Clip analysis failed.");
+  }
+
+  const event = normalizeEvent({
+    ...(data.event || data.analysis || {}),
+    source: "uploaded_clip_analysis",
+    summary: data.event?.summary || data.analysis?.summary || data.text || "The model analyzed this clip."
+  });
+
+  return {
+    provider: data.provider || "cat-model",
+    text: data.text || event.summary,
+    file: data.file || { name: file.name, type: file.type, size: file.size },
+    event
+  };
+}
 
 export async function analyzeCurrentMoment({ mediaEnabled, timeline }) {
   await wait(450);

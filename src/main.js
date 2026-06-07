@@ -1,7 +1,7 @@
 import { askAgent } from "./agentClient.js?v=5";
 import { buildDailyReport, buildRangeReport } from "./healthRules.js?v=3";
 import { connectLiveKit, disconnectLiveKit, isLiveKitConnected } from "./livekitClient.js?v=1";
-import { analyzeCurrentMoment } from "./modelAdapter.js?v=2";
+import { analyzeUploadedClip } from "./modelAdapter.js?v=4";
 import { createScenarioEvent, createSeedEvents, scenarioTypes } from "./sampleData.js?v=2";
 
 const storageKey = "meowmeowbeenz-events";
@@ -45,6 +45,8 @@ const state = {
   activityFilter: "all",
   mediaEnabled: false,
   stream: null,
+  uploadedClipUrl: "",
+  clipAnalysis: null,
   events: loadEvents(),
   chat: [
     {
@@ -163,7 +165,24 @@ async function startMediaPreview() {
 function handleClipUpload() {
   const file = elements.clipUpload.files?.[0];
   if (!file) return;
-  elements.mediaMessage.textContent = `${file.name} selected. Analyze Now will create a timeline event from this clip.`;
+  state.clipAnalysis = null;
+  if (state.uploadedClipUrl) {
+    URL.revokeObjectURL(state.uploadedClipUrl);
+  }
+  state.uploadedClipUrl = URL.createObjectURL(file);
+  elements.previewVideo.srcObject = null;
+  if (file.type.startsWith("video/")) {
+    elements.previewVideo.src = state.uploadedClipUrl;
+    elements.previewVideo.controls = true;
+    elements.previewVideo.muted = true;
+    elements.previewVideo.play().catch(() => {});
+  } else {
+    elements.previewVideo.removeAttribute("src");
+    elements.previewVideo.controls = false;
+  }
+  elements.mediaMessage.textContent = `${file.name} selected. Analyze clip will send only this file to the model.`;
+  renderMediaState();
+  renderCurrentStatus();
 }
 
 async function handleLiveKitToggle() {
@@ -195,12 +214,42 @@ async function handleLiveKitToggle() {
 }
 
 async function handleAnalyze() {
+  const file = elements.clipUpload.files?.[0];
+  if (!file) {
+    elements.mediaMessage.textContent = "Upload a clip first. LiveKit timeline analysis will come later.";
+    return;
+  }
+
   elements.analyzeNow.disabled = true;
   elements.analyzeNow.textContent = "Analyzing";
-  const event = await analyzeCurrentMoment({ mediaEnabled: state.mediaEnabled || Boolean(elements.clipUpload.files?.length), timeline: state.events });
-  addEvent({ ...event, source: elements.clipUpload.files?.length ? "uploaded_clip" : event.source });
-  elements.analyzeNow.disabled = false;
-  elements.analyzeNow.textContent = "Analyze now";
+  elements.mediaMessage.textContent = "Sending clip to model...";
+  try {
+    state.clipAnalysis = await analyzeUploadedClip(file);
+    elements.mediaMessage.textContent = `Model response received from ${state.clipAnalysis.provider}.`;
+  } catch (error) {
+    state.clipAnalysis = {
+      provider: "error",
+      text: error.message,
+      file: { name: file.name, type: file.type, size: file.size },
+      event: {
+        time: new Date().toISOString(),
+        state: "Clip analysis failed",
+        intent: "unknown",
+        behaviorLabel: "unknown",
+        soundType: "unknown",
+        confidence: 0,
+        riskLevel: "watch",
+        signals: [],
+        summary: error.message,
+        suggestion: "Try a shorter clip or check the model endpoint."
+      }
+    };
+    elements.mediaMessage.textContent = "Could not analyze this clip.";
+  } finally {
+    elements.analyzeNow.disabled = false;
+    elements.analyzeNow.textContent = "Analyze clip";
+    renderCurrentStatus();
+  }
 }
 
 async function handleAsk(question) {
@@ -392,9 +441,14 @@ function renderCatStatus(status) {
 }
 
 function renderMediaState() {
-  elements.mediaStatus.textContent = state.mediaEnabled ? "Media on" : "Media off";
-  elements.mediaStatus.classList.toggle("active", state.mediaEnabled);
-  elements.videoFallback.classList.toggle("hidden", state.mediaEnabled);
+  const file = elements.clipUpload.files?.[0];
+  const hasVideoClip = Boolean(file?.type.startsWith("video/"));
+  elements.mediaStatus.textContent = file ? "Clip ready" : state.mediaEnabled ? "Media on" : "Media off";
+  elements.mediaStatus.classList.toggle("active", state.mediaEnabled || Boolean(file));
+  elements.videoFallback.classList.toggle("hidden", state.mediaEnabled || hasVideoClip);
+  if (!state.mediaEnabled && !hasVideoClip) {
+    elements.videoFallback.querySelector("p").textContent = file ? "Audio clip selected" : "Camera preview appears here";
+  }
 }
 
 function renderScenarioButtons() {
@@ -403,25 +457,49 @@ function renderScenarioButtons() {
 }
 
 function renderCurrentStatus() {
+  if (state.clipAnalysis) {
+    const event = state.clipAnalysis.event;
+    elements.riskBadge.textContent = labelForRisk(event.riskLevel);
+    setRiskClass(elements.riskBadge, event.riskLevel);
+    elements.currentStatus.innerHTML = renderStatusObservation(event, state.clipAnalysis);
+    return;
+  }
+
   const latest = state.events[state.events.length - 1];
   if (!latest) {
     elements.riskBadge.textContent = "Baseline";
     setRiskClass(elements.riskBadge, "normal");
-    elements.currentStatus.innerHTML = `<div class="empty-state"><h3>No current observation yet</h3><p>Upload, stream, or run a live analysis to see model output here.</p></div>`;
+    elements.currentStatus.innerHTML = `<div class="empty-state"><h3>No clip analysis yet</h3><p>Upload a video or audio clip, then run Analyze clip to see the model response here.</p></div>`;
     return;
   }
   elements.riskBadge.textContent = labelForRisk(latest.riskLevel);
   setRiskClass(elements.riskBadge, latest.riskLevel);
-  elements.currentStatus.innerHTML = `
-    <div class="state-title">${escapeHtml(latest.state)}</div>
-    <div class="confidence-row"><span>${Math.round(latest.confidence * 100)}% confidence</span><span>${formatTime(latest.time)}</span></div>
-    <div class="confidence-meter"><span style="width:${Math.round(latest.confidence * 100)}%"></span></div>
+  elements.currentStatus.innerHTML = renderStatusObservation(latest);
+}
+
+function renderStatusObservation(event, analysis = null) {
+  return `
+    <div class="state-title">${escapeHtml(event.state)}</div>
+    <div class="confidence-row"><span>${Math.round(event.confidence * 100)}% confidence</span><span>${formatTime(event.time)}</span></div>
+    <div class="confidence-meter"><span style="width:${Math.round(event.confidence * 100)}%"></span></div>
     <dl class="status-details">
-      <div><dt>Intent</dt><dd>${escapeHtml(formatToken(latest.intent))}</dd></div>
-      <div><dt>Behavior</dt><dd>${escapeHtml(formatToken(latest.behaviorLabel))}</dd></div>
-      <div><dt>Sound</dt><dd>${escapeHtml(formatToken(latest.soundType))}</dd></div>
+      <div><dt>Intent</dt><dd>${escapeHtml(formatToken(event.intent))}</dd></div>
+      <div><dt>Behavior</dt><dd>${escapeHtml(formatToken(event.behaviorLabel))}</dd></div>
+      <div><dt>Sound</dt><dd>${escapeHtml(formatToken(event.soundType))}</dd></div>
     </dl>
-    <p>${escapeHtml(latest.summary)}</p><div class="suggestion">${escapeHtml(latest.suggestion)}</div>${renderSignalChips(latest.signals)}
+    ${analysis ? renderModelResponse(analysis) : ""}
+    <p>${escapeHtml(event.summary)}</p><div class="suggestion">${escapeHtml(event.suggestion)}</div>${renderSignalChips(event.signals)}
+  `;
+}
+
+function renderModelResponse(analysis) {
+  const fileName = analysis.file?.name || "uploaded clip";
+  return `
+    <div class="model-response">
+      <span>Model response · ${escapeHtml(analysis.provider)}</span>
+      <strong>${escapeHtml(fileName)}</strong>
+      <p>${escapeHtml(analysis.text)}</p>
+    </div>
   `;
 }
 
