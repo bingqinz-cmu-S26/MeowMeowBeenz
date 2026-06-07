@@ -168,4 +168,12 @@ async def retrieve_events(question: str, cat: str | None = None, limit: int = 6)
     results = []
     for s, event in scored[:limit]:
         results.append({**event, "when": None, "score": round(s, 3)})  # drop datetime for JSON safety
+
+    if not results and window is not None and cat_id:
+        # If a time window was too narrow for static demo data, fall back to recent cat events.
+        fallback = [e for e in candidates if e.get("catId") == cat_id]
+        fallback.sort(key=lambda e: e["when"] or now, reverse=True)
+        for event in fallback[:limit]:
+            results.append({**event, "when": None, "score": 0.0, "fallback": True})
+
     return results

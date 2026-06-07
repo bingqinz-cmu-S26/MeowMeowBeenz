@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     minimax_api_key: str = ""
     minimax_api_url: str = "https://api.minimax.io/v1/chat/completions"
-    minimax_model: str = "M2-her"
+    minimax_model: str = "MiniMax-M2"
     gemini_api_key: str = ""
     gemini_api_url: str = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     gemini_model: str = "gemini-3.5-flash"

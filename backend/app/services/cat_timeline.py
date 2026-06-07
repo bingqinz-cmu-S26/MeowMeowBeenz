@@ -66,15 +66,44 @@ def find_cat(name_or_id: str | None) -> dict | None:
     return None
 
 
-@lru_cache(maxsize=1)
-def all_events() -> list[dict]:
-    """Flatten every cat's timeline into a single list, enriched with cat + mood metadata.
+_INTENT_MOOD: dict[str, str] = {
+    "food_seeking": "soliciting",
+    "resting_or_low_energy": "sleepy",
+    "play_or_social_engagement": "playful",
+    "curious_exploration": "curious",
+    "social_bonding": "affectionate",
+    "activity_change": "restless",
+    "anxious_shift": "fearful",
+    "defensive_behavior": "agitated",
+    "pain_or_discomfort": "distress",
+    "self_care_or_discomfort": "grooming",
+    "territorial_warning": "territorial",
+    "routine_elimination": "content",
+    "routine_observation": "content",
+}
 
-    Each returned event carries: catId, catName, mood, moodLabel, moodSummary, action,
-    timestamp (raw string), when (datetime), confidence, description (may be "").
-    Sorted oldest -> newest.
-    """
-    moods = mood_index()
+
+def _convert_app_event(raw: dict, moods: dict[str, dict]) -> dict:
+    intent = str(raw.get("intent") or "").strip()
+    mood = _INTENT_MOOD.get(intent, "content")
+    mood_meta = moods.get(mood, {})
+    timestamp = str(raw.get("time") or raw.get("timestamp") or "")
+    return {
+        "id": raw.get("id"),
+        "catId": raw.get("catId", ""),
+        "catName": raw.get("catName", ""),
+        "mood": mood,
+        "moodLabel": mood_meta.get("label", mood),
+        "moodSummary": mood_meta.get("summary", ""),
+        "action": str(raw.get("state") or raw.get("action") or "Observed").strip(),
+        "timestamp": timestamp,
+        "when": parse_timestamp(timestamp) if timestamp else None,
+        "confidence": float(raw.get("confidence", 0.7) or 0.7),
+        "description": str(raw.get("summary") or raw.get("description") or "").strip(),
+    }
+
+
+def _timeline_events(moods: dict[str, dict]) -> list[dict]:
     events: list[dict] = []
     for cat in load_data().get("cats", []):
         for raw in cat.get("timeline", []):
@@ -93,6 +122,23 @@ def all_events() -> list[dict]:
                     "description": raw.get("description", ""),
                 }
             )
+    return events
+
+
+@lru_cache(maxsize=1)
+def all_events() -> list[dict]:
+    """Flatten demo events for retrieval.
+
+    Prefer `app.events` (full timeline used by the iOS app) when present; otherwise
+    fall back to the mood-centric `cats[].timeline` entries.
+    """
+    moods = mood_index()
+    app_events = load_data().get("app", {}).get("events", [])
+    if app_events:
+        events = [_convert_app_event(raw, moods) for raw in app_events if raw.get("time") or raw.get("timestamp")]
+    else:
+        events = _timeline_events(moods)
+
     events.sort(key=lambda e: e["when"] or datetime.min.replace(tzinfo=timezone.utc))
     return events
 

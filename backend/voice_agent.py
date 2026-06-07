@@ -13,7 +13,7 @@ Run standalone from backend/ for debugging (after pip install -r requirements-vo
     python voice_agent.py start     # production worker
 
 Required env (see ../.env.example):
-    MINIMAX_API_KEY, MINIMAX_MODEL, MINIMAX_API_URL   (brain + voice)
+    MINIMAX_API_KEY, MINIMAX_MODEL, MINIMAX_API_URL   (brain — prefer MiniMax-M2 for tool use)
     LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET  (room connection + Inference STT)
 
 STT uses LiveKit Inference (AssemblyAI), authenticated by your LiveKit credentials —
@@ -35,8 +35,13 @@ from app.services.minimax_llm import MiniMaxLLM
 
 from app.config import settings
 from app.services.agent import friendly_time
-from app.services.cat_timeline import get_cats, reference_now
+from app.services.cat_timeline import reference_now
 from app.services.retrieval import retrieve_events
+from app.services.voice_prompt import (
+    greeting_instruction,
+    tool_answer_instructions,
+    voice_agent_instructions,
+)
 
 # LiveKit worker CLI reads os.environ directly (not pydantic settings).
 for key, value in {
@@ -58,39 +63,23 @@ def _minimax_base_url() -> str:
     return url[: idx + len(marker)] if idx != -1 else "https://api.minimax.io/v1"
 
 
+def _observation_lines(events: list[dict], now) -> list[dict]:
+    return [
+        {
+            "cat": event["catName"],
+            "time": friendly_time(event["timestamp"], now) if event.get("timestamp") else "recently",
+            "mood": event["moodLabel"],
+            "action": event["action"],
+            "confidence": round(event["confidence"], 2),
+            "note": event.get("description") or None,
+        }
+        for event in events
+    ]
+
+
 class CatWellnessAgent(Agent):
     def __init__(self) -> None:
-        cats = get_cats()
-        cat_names = ", ".join(cat["name"] for cat in cats) or "the household cats"
-        cat_profiles = "; ".join(
-            f"{cat['name']}: {cat.get('ageYears', 'unknown')} years old, device {cat.get('device') or 'unknown'}"
-            for cat in cats
-        ) or "No cat profiles available."
-        super().__init__(
-            instructions=(
-                "You are Beenz, MeowMeowBeenz's calm cat-care voice assistant for pet owners. "
-                f"The household cats are: {cat_names}. "
-                f"Household cat profiles: {cat_profiles}. "
-                "\n\nVoice style:"
-                "\n- Speak like a helpful veterinary intake assistant, not like a cat."
-                "\n- Use plain owner-friendly language."
-                "\n- Keep answers to 1-3 short sentences."
-                "\n- Do not use stage directions, animal sounds, jokes, roleplay, or dramatic phrasing."
-                "\n\nGrounding rules:"
-                "\n- If the owner asks a profile question such as age, birth date, or device, answer from the household cat profiles without calling lookup_cat_activity."
-                "\n- If the owner asks about what a cat did, how a cat seems, health changes, or a time window, silently call lookup_cat_activity before answering."
-                "\n- Answer only from returned observations. Mention concrete times, cat names, actions, moods, and confidence when available."
-                "\n- Never invent observations, never diagnose disease, and never claim medical certainty."
-                "\n- If observations suggest distress or discomfort, say it is worth monitoring and suggest checking the cat in person."
-                "\n\nUnclear input rules:"
-                "\n- If the owner's speech transcription is unclear, fragmented, or not a usable question, ask one short clarifying question."
-                "\n- Good clarification: 'Which cat and what time should I check?'"
-                "\n- Do not answer from a guessed question."
-                "\n\nInvisible implementation rules:"
-                "\n- Never speak or print tool names, XML tags, JSON, arguments, code fences, API keys, missing keys, tokens, backend access, or implementation details."
-                "\n- If observations cannot be accessed, say exactly: I can't read the activity timeline clearly right now. Please try again in a moment."
-            )
-        )
+        super().__init__(instructions=voice_agent_instructions())
 
     @function_tool
     async def lookup_cat_activity(
@@ -99,35 +88,60 @@ class CatWellnessAgent(Agent):
         question: str,
         cat: str | None = None,
     ) -> dict:
-        """Retrieve what a cat was doing from the observation timeline (moss retrieval).
+        """Fetch logged cat activity from the household timeline.
 
-        Call this whenever the owner asks about a cat's behavior, mood, or a time window.
+        REQUIRED for any question about behavior, mood, what a cat did, or a time window
+        (today, yesterday, last night, this morning, etc.).
 
         Args:
-            question: The owner's question, e.g. "what was Mochi doing last night".
-            cat: Optional cat name to focus on. Use one of the household cat names from the instructions.
+            question: Copy the owner's question verbatim, e.g. "How was Luna yesterday?"
+            cat: The cat's name if mentioned — "Luna", "Milo", or "Saffron".
+                 Must not be null when the owner names a cat. Use null only for whole-household questions.
         """
         events = await retrieve_events(question, cat=cat, limit=6)
         if not events:
-            return {"observations": [], "note": "No matching observations found."}
+            logger.info(
+                "lookup_cat_activity returned no observations (question=%r, cat=%r)",
+                question,
+                cat,
+            )
+            return {
+                "observations": [],
+                "count": 0,
+                "matched_cats": [],
+                "instruction": tool_answer_instructions(count=0, matched_cats=[], empty=True),
+            }
+
         now = reference_now(events)
+        observations = _observation_lines(events, now)
+        matched_cats = sorted({event["catName"] for event in events if event.get("catName")})
+        logger.info(
+            "lookup_cat_activity returned %d observation(s) for question=%r cat=%r",
+            len(observations),
+            question,
+            cat,
+        )
         return {
-            "observations": [
-                {
-                    "cat": event["catName"],
-                    "time": friendly_time(event["timestamp"], now) if event.get("timestamp") else "recently",
-                    "mood": event["moodLabel"],
-                    "action": event["action"],
-                    "confidence": round(event["confidence"], 2),
-                    "note": event.get("description") or None,
-                }
-                for event in events
-            ]
+            "observations": observations,
+            "matched_cats": matched_cats,
+            "count": len(observations),
+            "instruction": tool_answer_instructions(
+                count=len(observations),
+                matched_cats=matched_cats,
+                empty=False,
+            ),
         }
 
 
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
+
+    if settings.minimax_model.strip().lower() in {"m2-her", "m2her"}:
+        logger.warning(
+            "MINIMAX_MODEL=%s is optimized for roleplay, not tool calling. "
+            "Set MINIMAX_MODEL=MiniMax-M2 in .env for smarter voice answers.",
+            settings.minimax_model,
+        )
 
     session = AgentSession(
         stt=inference.STT(model="assemblyai/universal-streaming", language="en"),
@@ -136,15 +150,15 @@ async def entrypoint(ctx: JobContext) -> None:
             base_url=_minimax_base_url(),
             api_key=settings.minimax_api_key,
             _strict_tool_schema=False,
+            temperature=0.7,
+            max_completion_tokens=512,
         ),
         tts=inference.TTS(model="cartesia/sonic", voice=""),
         vad=silero.VAD.load(),
     )
 
     await session.start(agent=CatWellnessAgent(), room=ctx.room)
-    await session.generate_reply(
-        instructions="Greet the owner warmly in one sentence and offer to tell them what their cats have been up to."
-    )
+    await session.generate_reply(instructions=greeting_instruction())
 
 
 if __name__ == "__main__":

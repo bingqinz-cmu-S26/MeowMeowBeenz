@@ -68,6 +68,12 @@ def sanitize_messages_for_minimax(messages: list[dict[str, Any]]) -> list[dict[s
             content = _message_text(message.get("content"))
             tool_calls = message.get("tool_calls") or []
             clean = {"role": "assistant"}
+            reasoning = message.get("reasoning_content")
+            if isinstance(reasoning, str) and reasoning.strip():
+                clean["reasoning_content"] = reasoning
+            details = message.get("reasoning_details")
+            if details:
+                clean["reasoning_details"] = details
             if tool_calls:
                 clean["tool_calls"] = [
                     {
@@ -131,6 +137,25 @@ class MiniMaxLLMStream(OpenAILLMStream):
 
 
 class MiniMaxLLM(OpenAILLM):
+    def __init__(
+        self,
+        *args,
+        temperature: float = 0.7,
+        max_completion_tokens: int = 512,
+        extra_body: dict[str, Any] | None = None,
+        **kwargs,
+    ) -> None:
+        merged_extra_body = {
+            "reasoning_split": True,
+            "thinking": {"type": "adaptive"},
+        }
+        if extra_body:
+            merged_extra_body.update(extra_body)
+        kwargs.setdefault("temperature", temperature)
+        kwargs.setdefault("max_completion_tokens", max_completion_tokens)
+        kwargs.setdefault("extra_body", merged_extra_body)
+        super().__init__(*args, **kwargs)
+
     def chat(self, *args, **kwargs):  # noqa: ANN002, ANN003
         stream = super().chat(*args, **kwargs)
         stream.__class__ = MiniMaxLLMStream
