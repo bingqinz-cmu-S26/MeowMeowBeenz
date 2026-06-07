@@ -1,0 +1,276 @@
+{
+  "version": 1,
+  "description": "Placeholder/MVP data. Each cat has a timeline of events; each event is { mood, action, timestamp, confidence } with an optional description. confidence is required on every event.",
+  "moods": [
+    {
+      "id": "content",
+      "label": "Content",
+      "summary": "Relaxed / happy"
+    },
+    {
+      "id": "affectionate",
+      "label": "Affectionate",
+      "summary": "Seeking closeness / bonding"
+    },
+    {
+      "id": "soliciting",
+      "label": "Soliciting",
+      "summary": "Wants something / food",
+      "tags": ["hunger"]
+    },
+    {
+      "id": "playful",
+      "label": "Hunting / Playful",
+      "summary": "Excited / stalking"
+    },
+    {
+      "id": "curious",
+      "label": "Curious / Alert",
+      "summary": "Investigating, attentive"
+    },
+    {
+      "id": "restless",
+      "label": "Restless / Frustrated",
+      "summary": "Blocked from a goal, pacing"
+    },
+    {
+      "id": "agitated",
+      "label": "Agitated / Defensive",
+      "summary": "\"Back off\" — annoyed or threatened"
+    },
+    {
+      "id": "fearful",
+      "label": "Fearful / Anxious",
+      "summary": "Scared, hiding, wary"
+    },
+    {
+      "id": "distress",
+      "label": "Distress",
+      "summary": "Something's wrong, possibly pain",
+      "tags": ["pain"]
+    },
+    {
+      "id": "discomfort",
+      "label": "Physical Discomfort",
+      "summary": "Aching or sore, low-grade pain",
+      "tags": ["pain"]
+    },
+    {
+      "id": "territorial",
+      "label": "Territorial / Warning",
+      "summary": "Guarding space, warning off another cat"
+    },
+    {
+      "id": "mating",
+      "label": "Mating Call / In Heat",
+      "summary": "Calling for a mate"
+    },
+    {
+      "id": "grooming",
+      "label": "Grooming",
+      "summary": "Self-care, licking, scratching"
+    },
+    {
+      "id": "sleepy",
+      "label": "Sleepy / Resting",
+      "summary": "Drowsy, dozing, low energy"
+    }
+  ],
+  "cats": [
+    {
+      "id": "mochi",
+      "name": "Mochi",
+      "breed": "Domestic Shorthair",
+      "ageYears": 3,
+      "timeline": [
+        {
+          "mood": "sleepy",
+          "action": "curled up on the windowsill",
+          "timestamp": "2026-06-07T06:40:00Z",
+          "confidence": 0.88,
+          "description": "Slow soft purr, eyes half closed in the early light."
+        },
+        {
+          "mood": "soliciting",
+          "action": "pacing by the food bowl",
+          "timestamp": "2026-06-07T07:55:00Z",
+          "confidence": 0.81,
+          "description": "Repeated short meows toward the kitchen, clearly asking for breakfast."
+        },
+        {
+          "mood": "content",
+          "action": "eating",
+          "timestamp": "2026-06-07T08:05:00Z",
+          "confidence": 0.9,
+          "description": "Steady posture at the bowl, faint purring between bites."
+        },
+        {
+          "mood": "grooming",
+          "action": "licking paws after the meal",
+          "timestamp": "2026-06-07T08:20:00Z",
+          "confidence": 0.84
+        },
+        {
+          "mood": "playful",
+          "action": "stalking a toy mouse",
+          "timestamp": "2026-06-07T11:30:00Z",
+          "confidence": 0.79,
+          "description": "Chattering at the toy, crouched and wiggling before a pounce."
+        },
+        {
+          "mood": "curious",
+          "action": "watching birds at the window",
+          "timestamp": "2026-06-07T15:05:00Z",
+          "confidence": 0.66
+        },
+        {
+          "mood": "restless",
+          "action": "scratching at a closed door",
+          "timestamp": "2026-06-07T19:10:00Z",
+          "confidence": 0.72,
+          "description": "Short sharp meows, wants access to the bedroom."
+        },
+        {
+          "mood": "distress",
+          "action": "lying still but vocalizing",
+          "timestamp": "2026-06-07T23:45:00Z",
+          "confidence": 0.61,
+          "description": "A high-intensity night yowl while otherwise inactive — worth watching for repeats."
+        }
+      ]
+    },
+    {
+      "id": "luna",
+      "name": "Luna",
+      "breed": "Siamese",
+      "ageYears": 5,
+      "timeline": [
+        {
+          "mood": "affectionate",
+          "action": "head-butting and rubbing against legs",
+          "timestamp": "2026-06-07T07:10:00Z",
+          "confidence": 0.86,
+          "description": "Trilling and weaving figure-eights, a warm morning greeting."
+        },
+        {
+          "mood": "content",
+          "action": "sunbathing on the couch",
+          "timestamp": "2026-06-07T09:30:00Z",
+          "confidence": 0.89,
+          "description": "Stretched out, slow blinks, steady purr."
+        },
+        {
+          "mood": "agitated",
+          "action": "facing off with the other cat",
+          "timestamp": "2026-06-07T14:15:00Z",
+          "confidence": 0.77,
+          "description": "Low growl and a brief hiss over a contested sunny spot."
+        },
+        {
+          "mood": "fearful",
+          "action": "hiding under the bed",
+          "timestamp": "2026-06-07T16:00:00Z",
+          "confidence": 0.7,
+          "description": "Retreated and went quiet after the doorbell rang."
+        },
+        {
+          "mood": "soliciting",
+          "action": "sitting by the treat cupboard",
+          "timestamp": "2026-06-07T18:25:00Z",
+          "confidence": 0.8,
+          "description": "Insistent meows aimed directly at the owner."
+        },
+        {
+          "mood": "sleepy",
+          "action": "dozing on a lap",
+          "timestamp": "2026-06-07T21:40:00Z",
+          "confidence": 0.85
+        }
+      ]
+    },
+    {
+      "id": "tofu",
+      "name": "Tofu",
+      "breed": "Maine Coon",
+      "ageYears": 8,
+      "timeline": [
+        {
+          "mood": "discomfort",
+          "action": "moving stiffly off the cat tree",
+          "timestamp": "2026-06-07T08:50:00Z",
+          "confidence": 0.64,
+          "description": "A soft cry on the jump down; possible joint soreness in an older cat."
+        },
+        {
+          "mood": "grooming",
+          "action": "over-licking one hind leg",
+          "timestamp": "2026-06-07T10:05:00Z",
+          "confidence": 0.68,
+          "description": "Focused, repeated grooming of the same spot — inspect skin if it continues."
+        },
+        {
+          "mood": "territorial",
+          "action": "guarding the hallway",
+          "timestamp": "2026-06-07T13:20:00Z",
+          "confidence": 0.73,
+          "description": "Low chatter and a warning yowl as Luna approached."
+        },
+        {
+          "mood": "content",
+          "action": "resting in the cat bed",
+          "timestamp": "2026-06-07T17:30:00Z",
+          "confidence": 0.87,
+          "description": "Calm and quiet, occasional purr."
+        },
+        {
+          "mood": "curious",
+          "action": "inspecting a new package",
+          "timestamp": "2026-06-07T18:40:00Z",
+          "confidence": 0.62
+        }
+      ]
+    },
+    {
+      "id": "biscuit",
+      "name": "Biscuit",
+      "breed": "Tabby",
+      "ageYears": 1,
+      "timeline": [
+        {
+          "mood": "playful",
+          "action": "chasing a feather wand",
+          "timestamp": "2026-06-07T09:00:00Z",
+          "confidence": 0.83,
+          "description": "Energetic chirrups and leaping; classic kitten play."
+        },
+        {
+          "mood": "playful",
+          "action": "ambushing from behind the sofa",
+          "timestamp": "2026-06-07T12:45:00Z",
+          "confidence": 0.8
+        },
+        {
+          "mood": "restless",
+          "action": "zooming around the apartment",
+          "timestamp": "2026-06-07T15:10:00Z",
+          "confidence": 0.71,
+          "description": "Bursts of running with short sharp meows — high unspent energy."
+        },
+        {
+          "mood": "soliciting",
+          "action": "begging at the dinner table",
+          "timestamp": "2026-06-07T19:30:00Z",
+          "confidence": 0.78,
+          "description": "Chirps and meows looking for a share of the food."
+        },
+        {
+          "mood": "sleepy",
+          "action": "crashed in a sunbeam",
+          "timestamp": "2026-06-07T20:15:00Z",
+          "confidence": 0.86,
+          "description": "Asleep mid-play, fully relaxed after the zoomies."
+        }
+      ]
+    }
+  ]
+}

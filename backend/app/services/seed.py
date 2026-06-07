@@ -1,0 +1,17 @@
+from app.database import get_database
+from app.services.sample_data import create_seed_events
+
+
+async def ensure_seed_data() -> None:
+    db = get_database()
+    if db is None:
+        return
+
+    await db.users.create_index("username", unique=True)
+    await db.users.create_index("id", unique=True)
+    await db.cats.create_index("id", unique=True)
+    await db.cats.create_index([("owner_id", 1), ("owner_username", 1), ("created_at", 1)])
+
+    event_count = await db.events.count_documents({})
+    if event_count == 0:
+        await db.events.insert_many(create_seed_events())
