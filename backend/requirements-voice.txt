@@ -1,0 +1,12 @@
+# Dependencies for the hands-free voice agent (voice_agent.py).
+# Installed separately from requirements.txt because they are heavy and only the
+# voice worker process needs them — the FastAPI server does not.
+#
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt -r requirements-voice.txt
+#
+livekit-agents~=1.5
+livekit-plugins-openai~=1.5     # MiniMax M2 via OpenAI-compatible endpoint
+livekit-plugins-minimax~=1.5    # MiniMax Speech-02 TTS
+livekit-plugins-deepgram~=1.5   # speech-to-text
+livekit-plugins-silero~=1.5     # voice activity detection / turn-taking
