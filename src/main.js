@@ -6,6 +6,39 @@ import { createScenarioEvent, createSeedEvents, scenarioTypes } from "./sampleDa
 
 const storageKey = "meowmeowbeenz-events";
 
+const catProfiles = [
+  {
+    id: "mochi",
+    name: "Mochi",
+    initials: "Mo",
+    age: "3 yrs",
+    breed: "Domestic shorthair",
+    room: "Living room",
+    routine: "Breakfast, couch naps, window watch",
+    accent: "#66d19e"
+  },
+  {
+    id: "miso",
+    name: "Miso",
+    initials: "Mi",
+    age: "5 yrs",
+    breed: "Tabby mix",
+    room: "Bedroom",
+    routine: "Long sleep blocks, quiet grooming",
+    accent: "#e4bd5b"
+  },
+  {
+    id: "bean",
+    name: "Bean",
+    initials: "Be",
+    age: "1 yr",
+    breed: "Tuxedo",
+    room: "Kitchen",
+    routine: "Play bursts, snack patrol, chirps",
+    accent: "#76c7d8"
+  }
+];
+
 const state = {
   activeTab: "home",
   reportRange: "day",
@@ -17,7 +50,7 @@ const state = {
     {
       role: "assistant",
       provider: "local",
-      text: "Ask Beenz about today, nighttime vocalizations, activity, or whether a pattern is worth watching."
+      text: "Ask Beenz about today, any cat's routine, nighttime vocalizations, activity, or whether a pattern is worth watching."
     }
   ]
 };
@@ -43,10 +76,15 @@ const elements = {
   chatForm: document.querySelector("#chatForm"),
   chatInput: document.querySelector("#chatInput"),
   promptButtons: document.querySelectorAll(".prompt-button"),
+  homeGreetingLabel: document.querySelector("#homeGreetingLabel"),
+  homeGreeting: document.querySelector("#homeGreeting"),
   homeOverallBadge: document.querySelector("#homeOverallBadge"),
   homeSummary: document.querySelector("#homeSummary"),
   homeInsight: document.querySelector("#homeInsight"),
   homeMetricGrid: document.querySelector("#homeMetricGrid"),
+  homePreview: document.querySelector("#homePreview"),
+  homeCatCount: document.querySelector("#homeCatCount"),
+  catRoster: document.querySelector("#catRoster"),
   homeActions: document.querySelectorAll("[data-go-tab]"),
   activityCount: document.querySelector("#activityCount"),
   activitySummary: document.querySelector("#activitySummary"),
@@ -202,32 +240,155 @@ function renderTabs() {
 
 function renderHome() {
   const report = buildDailyReport(state.events);
-  elements.homeOverallBadge.textContent = labelForRisk(report.overall);
-  setRiskClass(elements.homeOverallBadge, report.overall);
-  elements.homeSummary.textContent = buildHomeBrief(report);
-  elements.homeInsight.innerHTML = renderInsight(report);
-  elements.homeMetricGrid.innerHTML = renderMetrics([
-    ["Events", report.totalEvents], ["Eating", report.counts.eating], ["Litter", report.counts.litter],
-    ["Active", report.counts.active], ["Resting", report.counts.resting], ["Warnings", report.alerts.length]
-  ]);
+  const cats = buildCatHomeState(report);
+  const householdStatus = getHouseholdStatus(cats);
+  const greeting = buildGreeting();
+  elements.homeGreetingLabel.textContent = greeting.label;
+  elements.homeGreeting.textContent = greeting.text;
+  elements.homeOverallBadge.textContent = householdStatus;
+  setRiskClass(elements.homeOverallBadge, riskFromCatStatus(householdStatus));
+  elements.homeCatCount.textContent = `${cats.length} cats`;
+  elements.homeSummary.textContent = buildHomeBrief(report, cats);
+  elements.homeInsight.innerHTML = renderInsight(report, cats);
+  elements.homeMetricGrid.innerHTML = renderHomeStats(report, cats, householdStatus);
+  elements.homePreview.innerHTML = renderCatPreview(cats);
+  elements.catRoster.innerHTML = renderCatRoster(cats);
 }
 
-function buildHomeBrief(report) {
-  if (report.totalEvents === 0) return "No observations yet. Analyze a clip or load the demo day to generate the first Beenz brief.";
-  if (report.overall === "review") return "Beenz sees signals that deserve human review today, especially events where behavior and vocal cues do not fully agree.";
-  if (report.overall === "watch") return "Beenz sees a behavior shift worth watching. Keep an eye on routine signals like appetite, litter visits, activity, and nighttime vocalization.";
-  return "Beenz sees a calm baseline today, with no current health warnings from the recorded timeline.";
+function buildGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return { label: "Good morning", text: "Good morning, BingQ." };
+  if (hour < 18) return { label: "Good afternoon", text: "Good afternoon, BingQ." };
+  return { label: "Good evening", text: "Good evening, BingQ." };
 }
 
-function renderInsight(report) {
+function buildHomeBrief(report, cats) {
+  const alertCount = cats.filter((cat) => cat.status === "alert").length;
+  const watchCount = cats.filter((cat) => cat.status === "watch").length;
+  if (report.totalEvents === 0) return `${cats.length} cats are set up. Add live observations or load the demo day to turn this into a real household check-in.`;
+  if (alertCount > 0) return `${cats.length} cats checked in. One cat needs attention from today's behavior signals; the rest are kept in watch or normal status.`;
+  if (watchCount > 0) return `${cats.length} cats checked in. One routine is worth watching, but there is not enough signal to call it a health issue.`;
+  return `${cats.length} cats checked in. The household looks steady, with routines close to the recorded baseline.`;
+}
+
+function renderInsight(report, cats) {
   const alert = report.alerts[0];
   if (alert) {
     return `<strong>${escapeHtml(alert.title)}</strong><span>${escapeHtml(alert.evidence[0])}</span>`;
   }
   if (report.totalEvents > 0) {
-    return `<strong>Last night looks calm so far</strong><span>Rest, food, activity, and vocalization signals will become stronger as the timeline grows.</span>`;
+    const best = cats.find((cat) => cat.status === "perfect") || cats[0];
+    return `<strong>${escapeHtml(best.name)} looks ${escapeHtml(best.status)}</strong><span>Rest, food, activity, and vocalization signals will become stronger as the timeline grows.</span>`;
   }
-  return `<strong>Build a baseline</strong><span>MeowMeowBeenz works best after a few normal eating, activity, litter, and sleep observations.</span>`;
+  return `<strong>Build each cat's baseline</strong><span>MeowMeowBeenz works best after a few normal eating, activity, litter, vocal, and sleep observations.</span>`;
+}
+
+function buildCatHomeState(report) {
+  const statuses = deriveCatStatuses(report);
+  return catProfiles.map((cat, index) => ({
+    ...cat,
+    status: statuses[index],
+    lastSeen: getCatLastSeen(cat, index, report),
+    note: getCatStatusNote(cat, statuses[index], report),
+    vitals: getCatVitals(cat, index, report)
+  }));
+}
+
+function deriveCatStatuses(report) {
+  const mochi = report.overall === "review" ? "alert" : report.overall === "watch" ? "watch" : report.totalEvents > 0 ? "perfect" : "nice";
+  const miso = report.counts.resting >= 3 && report.counts.vocal <= 1 ? "perfect" : report.counts.active === 0 && report.totalEvents > 2 ? "watch" : "nice";
+  const bean = report.counts.vocal >= 3 || report.counts.review > 0 ? "alert" : report.counts.active >= 2 ? "perfect" : "nice";
+  return keepOneAlert([mochi, miso, bean]);
+}
+
+function keepOneAlert(statuses) {
+  const firstAlertIndex = statuses.findIndex((status) => status === "alert");
+  if (firstAlertIndex === -1) return statuses;
+  return statuses.map((status, index) => (status === "alert" && index !== firstAlertIndex ? "watch" : status));
+}
+
+function getCatLastSeen(cat, index, report) {
+  const latest = state.events[state.events.length - 1];
+  if (index === 0 && latest) return `${formatTime(latest.time)} · ${formatToken(latest.behaviorLabel)}`;
+  if (cat.id === "miso" && report.counts.resting > 0) return "Last rest block logged today";
+  if (cat.id === "bean" && report.counts.active > 0) return "Active burst logged today";
+  return cat.room;
+}
+
+function getCatStatusNote(cat, status, report) {
+  if (status === "alert") return "Needs a closer look. Compare this with appetite, litter, and vocal patterns.";
+  if (status === "watch") return "A routine changed enough to watch, but the signal is still early.";
+  if (status === "perfect") return "Routine is matching the calm baseline in today's timeline.";
+  if (report.totalEvents === 0) return "Profile ready. Waiting for live or uploaded observations.";
+  return "No clear concern from current household signals.";
+}
+
+function getCatVitals(cat, index, report) {
+  if (index === 0) return [["Events", report.totalEvents], ["Alerts", Math.min(report.alerts.length, 1)]];
+  if (cat.id === "miso") return [["Rest", report.counts.resting], ["Groom", report.counts.grooming || 0]];
+  return [["Active", report.counts.active], ["Vocal", report.counts.vocal]];
+}
+
+function getHouseholdStatus(cats) {
+  if (cats.some((cat) => cat.status === "alert")) return "alert";
+  if (cats.some((cat) => cat.status === "watch")) return "watch";
+  if (cats.every((cat) => cat.status === "perfect")) return "perfect";
+  return "nice";
+}
+
+function riskFromCatStatus(status) {
+  if (status === "alert") return "review";
+  if (status === "watch") return "watch";
+  return "normal";
+}
+
+function renderHomeStats(report, cats, householdStatus) {
+  return [
+    ["Cats", cats.length],
+    ["Household", householdStatus],
+    ["Events", report.totalEvents],
+    ["Warnings", Math.min(report.alerts.length, 1)]
+  ].map(([label, value]) => `<div class="home-stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+}
+
+function renderCatPreview(cats) {
+  return cats.map((cat) => `
+    <article class="cat-preview-row">
+      ${renderCatAvatar(cat)}
+      <div>
+        <strong>${escapeHtml(cat.name)}</strong>
+        <span>${escapeHtml(cat.lastSeen)}</span>
+      </div>
+      ${renderCatStatus(cat.status)}
+    </article>
+  `).join("");
+}
+
+function renderCatRoster(cats) {
+  return cats.map((cat) => `
+    <article class="cat-card ${escapeHtml(cat.status)}">
+      <div class="cat-card-top">
+        ${renderCatAvatar(cat)}
+        ${renderCatStatus(cat.status)}
+      </div>
+      <h3>${escapeHtml(cat.name)}</h3>
+      <p>${escapeHtml(cat.breed)} · ${escapeHtml(cat.age)}</p>
+      <dl class="cat-facts">
+        <div><dt>Room</dt><dd>${escapeHtml(cat.room)}</dd></div>
+        <div><dt>Routine</dt><dd>${escapeHtml(cat.routine)}</dd></div>
+      </dl>
+      <div class="cat-vitals">${cat.vitals.map(([label, value]) => `<span><b>${escapeHtml(value)}</b>${escapeHtml(label)}</span>`).join("")}</div>
+      <p class="cat-note">${escapeHtml(cat.note)}</p>
+    </article>
+  `).join("");
+}
+
+function renderCatAvatar(cat) {
+  return `<div class="cat-avatar" style="--cat-accent:${escapeHtml(cat.accent)}"><span>${escapeHtml(cat.initials)}</span></div>`;
+}
+
+function renderCatStatus(status) {
+  return `<span class="cat-status ${escapeHtml(status)}">${escapeHtml(status)}</span>`;
 }
 
 function renderMediaState() {
