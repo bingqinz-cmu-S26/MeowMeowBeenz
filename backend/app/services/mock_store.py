@@ -385,6 +385,14 @@ def create_scenario_event(scenario_type: str = "live") -> dict:
     return generated
 
 
+def create_seed_events() -> list[dict]:
+    return reset_events()
+
+
+def normalize_event(payload: Mapping[str, Any], source: str = "local") -> dict:
+    return _normalize_event_payload(payload, source=source)
+
+
 def reset_cats() -> list[dict]:
     global _RUNTIME_CATS
     _RUNTIME_CATS = _seed_cats()

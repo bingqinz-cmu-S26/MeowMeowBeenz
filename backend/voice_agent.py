@@ -1,8 +1,7 @@
 """Hands-free voice agent for MeowMeowBeenz (LiveKit Agents worker).
 
-Pipeline: AssemblyAI STT (via LiveKit Inference)  ->  MiniMax M2 LLM (with moss retrieval as a tool)  ->  MiniMax Speech-02 TTS.
-The LLM stays MiniMax; only the "ears" (STT) are borrowed. STT goes through LiveKit
-Inference, so it's billed on your LiveKit key with no separate STT account.
+Pipeline: AssemblyAI STT (via LiveKit Inference)  ->  MiniMax M2 LLM (with moss retrieval as a tool)  ->  Cartesia TTS (via LiveKit Inference).
+The LLM stays MiniMax; STT and TTS go through LiveKit Inference, billed on your LiveKit key.
 
 This is a SEPARATE process from the FastAPI server (app.main). It connects to a LiveKit
 room as an agent participant and talks to whoever joins (the mobile app).
@@ -21,14 +20,31 @@ no separate Deepgram/AssemblyAI account. Requires LiveKit Cloud (Inference is no
 """
 
 import logging
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from livekit.agents import Agent, AgentSession, JobContext, RunContext, WorkerOptions, cli, function_tool, inference
-from livekit.plugins import minimax, openai, silero
+from livekit.plugins import silero
+
+from app.services.minimax_llm import MiniMaxLLM
 
 from app.config import settings
 from app.services.agent import friendly_time
 from app.services.cat_timeline import get_cats, reference_now
 from app.services.retrieval import retrieve_events
+
+# LiveKit worker CLI reads os.environ directly (not pydantic settings).
+for key, value in {
+    "LIVEKIT_URL": settings.livekit_url,
+    "LIVEKIT_API_KEY": settings.livekit_api_key,
+    "LIVEKIT_API_SECRET": settings.livekit_api_secret,
+}.items():
+    if value:
+        os.environ.setdefault(key, value)
 
 logger = logging.getLogger("cat-voice-agent")
 
@@ -96,12 +112,13 @@ async def entrypoint(ctx: JobContext) -> None:
 
     session = AgentSession(
         stt=inference.STT(model="assemblyai/universal-streaming", language="en"),
-        llm=openai.LLM(
+        llm=MiniMaxLLM(
             model=settings.minimax_model,
             base_url=_minimax_base_url(),
             api_key=settings.minimax_api_key,
+            _strict_tool_schema=False,
         ),
-        tts=minimax.TTS(model="speech-02-turbo"),
+        tts=inference.TTS(model="cartesia/sonic", voice=""),
         vad=silero.VAD.load(),
     )
 

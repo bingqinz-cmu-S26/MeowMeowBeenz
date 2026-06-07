@@ -80,14 +80,26 @@ echo "==> API URL: $API_URL"
 echo "==> Backend is running on http://localhost:8000 (Ctrl+C stops it)"
 echo ""
 
-if [[ "${START_VOICE_WORKER:-0}" == "1" || "${START_VOICE_WORKER:-false}" == "true" ]]; then
+if [[ -f .env ]] && grep -qE '^LIVEKIT_URL=.+' .env && [[ "${START_VOICE_WORKER:-1}" != "0" ]]; then
   echo "==> Installing voice requirements (backend/requirements-voice.txt)..."
   backend/.venv/bin/pip install -q -r backend/requirements-voice.txt
 
-  echo "==> Starting voice worker..."
+  echo "==> Starting voice worker (dev)..."
   (
     cd backend
-    exec .venv/bin/python voice_agent.py start
+    exec .venv/bin/python voice_agent.py dev
+  ) &
+  VOICE_PID=$!
+  echo "==> Voice worker running (set START_VOICE_WORKER=0 to skip)"
+  echo ""
+elif [[ "${START_VOICE_WORKER:-0}" == "1" || "${START_VOICE_WORKER:-false}" == "true" ]]; then
+  echo "==> Installing voice requirements (backend/requirements-voice.txt)..."
+  backend/.venv/bin/pip install -q -r backend/requirements-voice.txt
+
+  echo "==> Starting voice worker (dev)..."
+  (
+    cd backend
+    exec .venv/bin/python voice_agent.py dev
   ) &
   VOICE_PID=$!
 fi

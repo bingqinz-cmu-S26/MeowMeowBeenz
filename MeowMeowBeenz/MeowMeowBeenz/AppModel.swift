@@ -159,7 +159,8 @@ final class AppModel {
     // MARK: Voice
 
     func livekitToken() async throws -> LiveKitToken {
-        try await client.livekitToken()
+        let room = "voice-\(UUID().uuidString.lowercased())"
+        return try await client.livekitToken(room: room)
     }
 
     // MARK: Clip upload

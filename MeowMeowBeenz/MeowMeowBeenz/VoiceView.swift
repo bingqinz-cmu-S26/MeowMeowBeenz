@@ -103,10 +103,10 @@ struct VoiceView: View {
     }
 
     private func toggle() {
-        if voice.isActive {
-            Task { await voice.stop() }
-        } else {
-            Task {
+        Task {
+            if voice.isActive {
+                await voice.stop()
+            } else {
                 do {
                     let token = try await app.livekitToken()
                     await voice.connect(url: token.url, token: token.token, configured: token.configured)
