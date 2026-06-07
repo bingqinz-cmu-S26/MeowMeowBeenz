@@ -9,6 +9,7 @@ import hmac
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -16,6 +17,10 @@ MINIMAX_DEFAULT_URL = "https://api.minimax.io/v1/chat/completions"
 MINIMAX_DEFAULT_MODEL = "M2-her"
 MINIMAX_TIMEOUT_SECONDS = 12
 CAT_MODEL_TIMEOUT_SECONDS = 45
+GEMINI_DEFAULT_BASE = "https://generativelanguage.googleapis.com"
+GEMINI_DEFAULT_MODEL = "gemini-3.5-flash"
+GEMINI_TIMEOUT_SECONDS = 60
+GEMINI_INLINE_LIMIT_BYTES = 12 * 1024 * 1024
 MAX_CLIP_BYTES = 80 * 1024 * 1024
 
 
@@ -212,10 +217,249 @@ def sanitize_filename(filename):
 
 
 def analyze_clip(clip):
+    if os.environ.get("GEMINI_API_KEY"):
+        return call_gemini_clip(clip)
+
     model_url = os.environ.get("CAT_MODEL_URL")
     if model_url:
         return call_cat_model(model_url, clip)
     return local_clip_analysis(clip)
+
+
+def call_gemini_clip(clip):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise MissingKeyError("GEMINI_API_KEY is required for Gemini clip analysis.")
+
+    model = os.environ.get("GEMINI_MODEL", GEMINI_DEFAULT_MODEL)
+    media_part = gemini_media_part(api_key, clip)
+    request_body = {
+        "contents": [{
+            "role": "user",
+            "parts": [
+                media_part,
+                {"text": build_gemini_clip_prompt()},
+            ],
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 1200,
+            "responseMimeType": "application/json",
+            "responseSchema": gemini_event_schema(),
+        },
+    }
+    generate_url = f"{gemini_base_url()}/v1beta/models/{quote(model, safe='')}:generateContent"
+    try:
+        data = post_gemini_json(generate_url, api_key, request_body, timeout=GEMINI_TIMEOUT_SECONDS)
+    except UpstreamError as error:
+        if "response" not in str(error).lower():
+            raise
+        request_body["generationConfig"].pop("responseMimeType", None)
+        request_body["generationConfig"].pop("responseSchema", None)
+        data = post_gemini_json(generate_url, api_key, request_body, timeout=GEMINI_TIMEOUT_SECONDS)
+    text = gemini_response_text(data)
+    payload = parse_json_object_text(text)
+    payload["provider"] = f"gemini:{model}"
+    return normalize_clip_model_response(payload, clip, payload["provider"])
+
+
+def gemini_media_part(api_key, clip):
+    if clip["size"] <= int(os.environ.get("GEMINI_INLINE_LIMIT_BYTES", GEMINI_INLINE_LIMIT_BYTES)):
+        return {
+            "inline_data": {
+                "mime_type": clip["content_type"],
+                "data": base64.b64encode(clip["data"]).decode("ascii"),
+            }
+        }
+
+    file_data = upload_gemini_file(api_key, clip)
+    return {
+        "file_data": {
+            "mime_type": clip["content_type"],
+            "file_uri": file_data["uri"],
+        }
+    }
+
+
+def upload_gemini_file(api_key, clip):
+    upload_start = Request(
+        f"{gemini_base_url()}/upload/v1beta/files",
+        data=json.dumps({"file": {"display_name": clip["filename"]}}).encode("utf-8"),
+        headers={
+            "x-goog-api-key": api_key,
+            "X-Goog-Upload-Protocol": "resumable",
+            "X-Goog-Upload-Command": "start",
+            "X-Goog-Upload-Header-Content-Length": str(clip["size"]),
+            "X-Goog-Upload-Header-Content-Type": clip["content_type"],
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(upload_start, timeout=GEMINI_TIMEOUT_SECONDS) as response:
+            upload_url = response.headers.get("x-goog-upload-url")
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise UpstreamError(f"Gemini file upload start failed HTTP {error.code}: {detail[:500]}") from error
+    except URLError as error:
+        raise UpstreamError(f"Could not start Gemini file upload: {error.reason}") from error
+
+    if not upload_url:
+        raise UpstreamError("Gemini did not return a resumable upload URL.")
+
+    upload_finalize = Request(
+        upload_url,
+        data=clip["data"],
+        headers={
+            "Content-Length": str(clip["size"]),
+            "X-Goog-Upload-Offset": "0",
+            "X-Goog-Upload-Command": "upload, finalize",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(upload_finalize, timeout=GEMINI_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise UpstreamError(f"Gemini file upload failed HTTP {error.code}: {detail[:500]}") from error
+    except URLError as error:
+        raise UpstreamError(f"Could not upload clip to Gemini: {error.reason}") from error
+    except json.JSONDecodeError as error:
+        raise UpstreamError("Gemini file upload returned invalid JSON.") from error
+
+    file_info = payload.get("file") or {}
+    if not file_info.get("uri"):
+        raise UpstreamError("Gemini file upload did not return file.uri.")
+    wait_for_gemini_file(api_key, file_info)
+    return file_info
+
+
+def wait_for_gemini_file(api_key, file_info):
+    name = file_info.get("name")
+    state = (file_info.get("state") or "").upper()
+    if not name or state in {"", "ACTIVE"}:
+        return
+
+    for _ in range(10):
+        time.sleep(1)
+        request = Request(
+            f"{gemini_base_url()}/v1beta/{quote(name, safe='/')}",
+            headers={"x-goog-api-key": api_key},
+            method="GET",
+        )
+        try:
+            with urlopen(request, timeout=GEMINI_TIMEOUT_SECONDS) as response:
+                refreshed = json.loads(response.read().decode("utf-8"))
+        except (HTTPError, URLError, json.JSONDecodeError):
+            return
+        state = (refreshed.get("state") or "").upper()
+        if state == "ACTIVE":
+            return
+        if state == "FAILED":
+            raise UpstreamError("Gemini file processing failed.")
+
+
+def post_gemini_json(url, api_key, body, timeout):
+    request = Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise UpstreamError(f"Gemini returned HTTP {error.code}: {detail[:500]}") from error
+    except URLError as error:
+        raise UpstreamError(f"Could not reach Gemini: {error.reason}") from error
+    except TimeoutError as error:
+        raise UpstreamError("Gemini request timed out.") from error
+    except json.JSONDecodeError as error:
+        raise UpstreamError("Gemini returned invalid JSON.") from error
+
+
+def gemini_base_url():
+    return os.environ.get("GEMINI_API_BASE", GEMINI_DEFAULT_BASE).rstrip("/")
+
+
+def build_gemini_clip_prompt():
+    return (
+        "Analyze this uploaded cat audio/video clip for MeowMeowBeenz. "
+        "Return only one compact JSON object. Do not include markdown, code fences, prose, or reasoning. "
+        "The JSON object must contain: text, state, intent, behaviorLabel, soundType, confidence, "
+        "riskLevel, signals, summary, suggestion. "
+        "Use the same field semantics as the app mock events: state is a short human-readable status; "
+        "intent is the likely cat intent; behaviorLabel is a compact behavior token such as "
+        "maintenance_nutrition.eating, inactive_lying.resting, active_walking, active_playfight.playing, "
+        "maintenance_littering.digging, maintenance_scratching, or unknown; soundType is a compact audio token "
+        "such as quiet, short_meow, repeated_meow, chirp, caterwauling, distress_like_yowl, or unknown. "
+        "riskLevel must be normal, watch, or review. Do not diagnose disease. "
+        "If the clip is ambiguous, keep riskLevel normal or watch unless there is a clear reason to review."
+    )
+
+
+def gemini_event_schema():
+    return {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"},
+            "state": {"type": "string"},
+            "intent": {"type": "string"},
+            "behaviorLabel": {"type": "string"},
+            "soundType": {"type": "string"},
+            "confidence": {"type": "number"},
+            "riskLevel": {"type": "string", "enum": ["normal", "watch", "review"]},
+            "signals": {"type": "array", "items": {"type": "string"}},
+            "summary": {"type": "string"},
+            "suggestion": {"type": "string"},
+        },
+        "required": [
+            "text",
+            "state",
+            "intent",
+            "behaviorLabel",
+            "soundType",
+            "confidence",
+            "riskLevel",
+            "signals",
+            "summary",
+            "suggestion",
+        ],
+    }
+
+
+def gemini_response_text(data):
+    try:
+        parts = data["candidates"][0]["content"]["parts"]
+    except (KeyError, IndexError, TypeError) as error:
+        raise UpstreamError("Gemini response did not include candidates[0].content.parts.") from error
+    text_parts = [str(part.get("text", "")) for part in parts if isinstance(part, dict) and part.get("text")]
+    text = "".join(text_parts).strip()
+    if not text:
+        raise UpstreamError("Gemini response did not include text.")
+    return text
+
+
+def parse_json_object_text(text):
+    clean = str(text).strip()
+    clean = re.sub(r"^```(?:json)?", "", clean, flags=re.IGNORECASE).strip()
+    clean = re.sub(r"```$", "", clean).strip()
+    try:
+        return json.loads(clean)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", clean, flags=re.DOTALL)
+        if not match:
+            raise UpstreamError("Gemini did not return JSON in the expected event format.")
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError as error:
+            raise UpstreamError("Gemini returned malformed JSON.") from error
 
 
 def call_cat_model(model_url, clip):
@@ -300,9 +544,9 @@ def normalize_clip_model_response(payload, clip, fallback_provider):
     event = {
         "source": "uploaded_clip_analysis",
         "state": first_text(event_source, ["state", "status"]) or "Clip analyzed",
-        "intent": first_text(event_source, ["intent", "predicted_intent"]) or "unknown",
-        "behaviorLabel": first_text(event_source, ["behaviorLabel", "behavior", "behavior_label"]) or "unknown",
-        "soundType": first_text(event_source, ["soundType", "sound", "sound_type", "audio"]) or "unknown",
+        "intent": compact_token(first_text(event_source, ["intent", "predicted_intent"])) or "unknown",
+        "behaviorLabel": compact_token(first_text(event_source, ["behaviorLabel", "behavior", "behavior_label"])) or "unknown",
+        "soundType": compact_token(first_text(event_source, ["soundType", "sound", "sound_type", "audio"])) or "unknown",
         "confidence": safe_confidence(event_source.get("confidence", payload.get("confidence", 0))),
         "riskLevel": safe_risk(event_source.get("riskLevel", event_source.get("risk", payload.get("riskLevel", "normal")))),
         "signals": safe_signals(event_source.get("signals", payload.get("signals", []))),
@@ -324,7 +568,7 @@ def normalize_clip_model_response(payload, clip, fallback_provider):
 def local_clip_analysis(clip):
     text = (
         "Local demo analysis: clip upload succeeded. "
-        "A real cat model endpoint is not configured yet, so this is a placeholder response."
+        "Gemini is not configured yet, so this is a placeholder event in the app mock-data format."
     )
     payload = {
         "provider": "local-demo",
@@ -337,7 +581,7 @@ def local_clip_analysis(clip):
             "confidence": 0.0,
             "riskLevel": "normal",
             "summary": text,
-            "suggestion": "Set CAT_MODEL_URL on the server to send uploaded clips to the real model.",
+            "suggestion": "Set GEMINI_API_KEY on the server to send uploaded clips to Gemini 3.5 Flash.",
         },
     }
     return normalize_clip_model_response(payload, clip, "local-demo")
@@ -349,6 +593,13 @@ def first_text(source, keys):
         if value is not None and str(value).strip():
             return str(value).strip()
     return ""
+
+
+def compact_token(value):
+    token = str(value or "").strip().lower()
+    token = re.sub(r"[^a-z0-9.]+", "_", token)
+    token = re.sub(r"_+", "_", token).strip("_.")
+    return token
 
 
 def safe_confidence(value):
@@ -372,9 +623,9 @@ def safe_risk(value):
 
 def safe_signals(value):
     if isinstance(value, list):
-        return [str(item) for item in value if str(item).strip()][:8]
+        return [compact_token(item) for item in value if compact_token(item)][:8]
     if isinstance(value, str) and value.strip():
-        return [value.strip()]
+        return [compact_token(value)]
     return []
 
 
