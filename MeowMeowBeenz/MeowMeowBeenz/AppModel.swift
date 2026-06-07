@@ -33,6 +33,7 @@ final class AppModel {
 
     // Status
     var apiReachable = false
+    var mongodbStatus = "unknown"
     var isLoading = false
     var errorMessage: String?
 
@@ -52,10 +53,25 @@ final class AppModel {
     func bootstrap() async {
         isLoading = true
         defer { isLoading = false }
-        apiReachable = (try? await client.health()) ?? false
+        await refreshAPIStatus()
         await loadTimelineAndReport()
         if token != nil {
             await restoreSession()
+        }
+    }
+
+    func refreshAPIStatus() async {
+        do {
+            let health = try await client.health()
+            apiReachable = health.ok
+            mongodbStatus = health.mongodb ?? "unknown"
+            if mongodbStatus == "connected",
+               errorMessage == "MongoDB is required for authentication." {
+                errorMessage = nil
+            }
+        } catch {
+            apiReachable = false
+            mongodbStatus = "unreachable"
         }
     }
 

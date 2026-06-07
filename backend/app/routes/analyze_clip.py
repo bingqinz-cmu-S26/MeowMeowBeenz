@@ -47,6 +47,7 @@ async def analyze_clip(request: Request) -> ClipAnalysisResponse:
         ok=True,
         provider=result["provider"],
         text=result["text"],
+        rawText=result.get("rawText"),
         file=ClipFileInfo(
             name=filename,
             type=media_type,

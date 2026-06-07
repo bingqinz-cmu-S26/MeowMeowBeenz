@@ -52,6 +52,11 @@ struct AccountView: View {
                     ))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    LabeledContent("API", value: app.apiReachable ? "Online" : "Offline")
+                    LabeledContent("MongoDB", value: app.mongodbStatus == "connected" ? "Connected" : app.mongodbStatus)
+                    Button("Refresh server") {
+                        Task { await app.refreshAPIStatus() }
+                    }
                 }
 
                 if let error = app.errorMessage {
@@ -62,6 +67,7 @@ struct AccountView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
             }
+            .task { await app.refreshAPIStatus() }
             .overlay { if working { ProgressView() } }
         }
     }

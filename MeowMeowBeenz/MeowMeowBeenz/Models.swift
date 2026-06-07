@@ -103,7 +103,11 @@ struct ChatMessage: Identifiable, Hashable {
 
 // MARK: - Response envelopes
 
-struct HealthResponse: Codable { let ok: Bool }
+struct HealthResponse: Codable {
+    let ok: Bool
+    let service: String?
+    let mongodb: String?
+}
 struct AuthResponse: Codable { let ok: Bool; let user: AuthUser; let token: String }
 struct MeResponse: Codable { let ok: Bool; let user: AuthUser }
 struct CatsResponse: Codable { let ok: Bool; let cats: [CatProfile]; let owner: String? }
@@ -112,11 +116,12 @@ struct EventsResponse: Codable { let ok: Bool; let events: [TimelineEvent]; let 
 struct ReportResponse: Codable { let ok: Bool; let report: HealthReport }
 struct AgentResponse: Codable { let ok: Bool; let answer: String; let provider: String }
 struct ScenariosResponse: Codable { let ok: Bool; let scenarios: [ScenarioType] }
-struct ClipFileInfo: Codable { let name: String; let type: String; let size: Int? = nil }
+struct ClipFileInfo: Codable { let name: String; let type: String; let size: Int? }
 struct ClipAnalysisResponse: Codable {
     let ok: Bool
     let provider: String
     let text: String
+    let rawText: String?
     let file: ClipFileInfo?
     let event: TimelineEvent?
     let analysis: TimelineEvent?

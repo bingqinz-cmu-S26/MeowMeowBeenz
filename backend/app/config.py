@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     minimax_model: str = "M2-her"
     gemini_api_key: str = ""
     gemini_api_url: str = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.5-flash"
 
     livekit_url: str = ""
     livekit_api_key: str = ""

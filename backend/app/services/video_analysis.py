@@ -1,7 +1,10 @@
 import base64
 import json
 import random
+import re
 from collections.abc import Mapping
+from datetime import datetime, timezone
+import secrets
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -10,9 +13,11 @@ from app.services.sample_data import SCENARIO_CATALOG, create_scenario_event
 
 
 GEMINI_PROMPT = (
-    "You are a cat-observation assistant. Analyze this uploaded clip and return JSON only with keys "
-    "summary, state, intent, behaviorLabel, soundType, confidence, riskLevel, signals, suggestion. "
-    "Use 0.0-1.0 for confidence and include at least one concise summary sentence. "
+    "You are a cat-observation assistant. Analyze this uploaded clip and return JSON only. "
+    "Do not use markdown fences or extra text. Required keys: summary, state, intent, "
+    "behaviorLabel, soundType, confidence, riskLevel, signals, suggestion. "
+    "Use 0.0-1.0 for confidence. riskLevel must be one of: normal, watch, review. "
+    "If the cat appears relaxed, purring, content, playful, or affectionate, use riskLevel normal. "
     "If uncertain, lower confidence and avoid diagnosis."
 )
 
@@ -63,8 +68,15 @@ def _merge_with_model_output(event: dict, model_output: Mapping[str, object]) ->
         event["signals"] = filtered
 
 
+def _strip_code_fences(text: str) -> str:
+    cleaned = text.strip()
+    cleaned = re.sub(r"^\s*```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```\s*$", "", cleaned)
+    return cleaned.strip()
+
+
 def _coerce_json(text: str) -> dict | None:
-    text = text.strip()
+    text = _strip_code_fences(text)
     if not text:
         return None
 
@@ -82,6 +94,116 @@ def _coerce_json(text: str) -> dict | None:
     if isinstance(parsed, Mapping):
         return dict(parsed)
     return None
+
+
+def _coerce_model_output(text: str) -> dict:
+    parsed = _coerce_json(text)
+    if parsed:
+        return parsed
+
+    # Salvage common JSON-ish model output, including truncated/debug strings.
+    found: dict[str, object] = {}
+    for match in re.finditer(r'"([^"]+)"\s*:\s*"((?:\\.|[^"\\])*)"', text, flags=re.DOTALL):
+        key, value = match.groups()
+        try:
+            found[key] = json.loads(f'"{value}"')
+        except json.JSONDecodeError:
+            found[key] = value
+
+    confidence_match = re.search(r'"confidence"\s*:\s*([0-9]*\.?[0-9]+)', text)
+    if confidence_match:
+        found["confidence"] = float(confidence_match.group(1))
+
+    risk_match = re.search(r'"riskLevel"\s*:\s*"([^"]+)"', text)
+    if risk_match:
+        found["riskLevel"] = risk_match.group(1)
+
+    return found
+
+
+def _first_string(data: Mapping[str, object], *keys: str) -> str:
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _confidence(value: object) -> float:
+    if isinstance(value, int | float):
+        score = float(value)
+    elif isinstance(value, str):
+        stripped = value.strip().rstrip("%")
+        try:
+            score = float(stripped)
+            if "%" in value or score > 1:
+                score /= 100
+        except ValueError:
+            score = 0.6
+    else:
+        score = 0.6
+    return max(0.0, min(1.0, score))
+
+
+def _risk_level(value: object, model_output: Mapping[str, object]) -> str:
+    raw = str(value or "").strip().lower()
+    text = " ".join(str(model_output.get(key, "")) for key in ("summary", "state", "intent", "behaviorLabel", "soundType"))
+    text = text.lower()
+
+    if raw in {"normal", "watch", "review"}:
+        return raw
+    if raw in {"low", "none", "safe", "ok", "okay", "happy", "content", "relaxed"}:
+        return "normal"
+    if raw in {"medium", "moderate", "caution", "monitor"}:
+        return "watch"
+    if raw in {"high", "alert", "urgent", "concern"}:
+        return "review"
+    if any(token in text for token in ("distress", "pain", "discomfort", "yowl", "hiss", "growl")):
+        return "watch"
+    return "normal"
+
+
+def _signals(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str) and value.strip():
+        return [item.strip() for item in re.split(r"[,;]", value) if item.strip()]
+    return []
+
+
+def _event_from_model_output(model_output: Mapping[str, object], raw_text: str, filename: str) -> dict:
+    summary = _first_string(model_output, "summary", "text", "description")
+    has_structured_fields = any(
+        _first_string(model_output, key)
+        for key in ("state", "intent", "behaviorLabel", "soundType")
+    )
+    if not summary:
+        summary = _strip_code_fences(raw_text) or f"Gemini analyzed {filename}, but did not return a structured summary."
+    elif not has_structured_fields:
+        summary = "Gemini returned an incomplete structured response. Open the raw response to inspect the model output."
+
+    state = _first_string(model_output, "state", "mood", "status") or "Incomplete Gemini response"
+    intent = _first_string(model_output, "intent", "likelyIntent") or "unknown"
+    behavior = _first_string(model_output, "behaviorLabel", "behavior", "behavior_label", "activity") or "unknown"
+    sound = _first_string(model_output, "soundType", "sound", "sound_type", "audio", "vocalization") or "unknown"
+    suggestion = _first_string(model_output, "suggestion", "recommendation", "nextStep")
+    if not suggestion:
+        suggestion = "Treat this as an observation, and compare it with the cat's recent baseline."
+
+    return {
+        "id": f"evt_gemini_{int(datetime.now(timezone.utc).timestamp() * 1000)}_{secrets.token_hex(3)}",
+        "time": datetime.now(timezone.utc).isoformat(),
+        "source": "gemini",
+        "state": state,
+        "intent": intent,
+        "behaviorLabel": behavior,
+        "soundType": sound,
+        "confidence": _confidence(model_output.get("confidence")),
+        "riskLevel": _risk_level(model_output.get("riskLevel"), model_output),
+        "signals": _signals(model_output.get("signals")),
+        "summary": summary,
+        "suggestion": suggestion,
+    }
 
 
 def _analyze_with_gemini(file_data: bytes, mime_type: str) -> dict:
@@ -112,7 +234,8 @@ def _analyze_with_gemini(file_data: bytes, mime_type: str) -> dict:
         ],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 512,
+            "maxOutputTokens": 2048,
+            "responseMimeType": "application/json",
         },
     }
 
@@ -132,40 +255,52 @@ def _analyze_with_gemini(file_data: bytes, mime_type: str) -> dict:
     except URLError as exc:
         raise RuntimeError(f"Could not reach Gemini: {exc}") from exc
 
-    text = None
     try:
-        text = payload["candidates"][0]["content"]["parts"][0]["text"]
+        text = str(payload["candidates"][0]["content"]["parts"][0]["text"]).strip()
     except (KeyError, IndexError, TypeError):
         raise RuntimeError("Gemini returned a malformed response.")
 
-    parsed = _coerce_json(str(text))
-    summary = str(text).strip()
+    parsed = _coerce_model_output(text)
     if not parsed:
-        return {"provider": "gemini", "text": summary}
+        return {"provider": "gemini", "text": text, "rawText": text, "parsed": {}}
 
-    result = {"provider": "gemini", "summary": summary}
+    result = {"provider": "gemini", "rawText": text, "parsed": parsed}
     result.update(parsed)
     return result
 
 
 def analyze_video_clip(filename: str, file_data: bytes, mime_type: str) -> dict:
-    summary = _local_analysis_payload(filename=filename or "upload.mov", size=len(file_data))
+    filename = filename or "upload.mov"
 
     try:
         model_result = _analyze_with_gemini(file_data=file_data, mime_type=mime_type)
     except Exception as exc:  # noqa: BLE001
+        summary = _local_analysis_payload(filename=filename, size=len(file_data))
         summary["text"] = f"{summary['text']} Fallback used: {str(exc)[:220]}"
+        summary["rawText"] = summary["text"]
+        return summary
+
+    if model_result.get("provider") != "gemini":
+        summary = _local_analysis_payload(filename=filename, size=len(file_data))
+        summary["text"] = str(model_result.get("text") or summary["text"])
+        summary["rawText"] = summary["text"]
         return summary
 
     text = model_result.get("summary")
-    if isinstance(text, str) and text.strip():
-        summary["text"] = text.strip()
-    elif model_result.get("text"):
-        summary["text"] = str(model_result["text"]).strip()
+    raw_text = str(model_result.get("rawText") or model_result.get("text") or "").strip()
+    if not isinstance(text, str) or not text.strip():
+        text = raw_text
 
-    merged = dict(summary["event"])
-    _merge_with_model_output(event=merged, model_output=model_result)
+    model_fields = model_result.get("parsed")
+    if not isinstance(model_fields, Mapping):
+        model_fields = model_result
+    event = _event_from_model_output(model_fields, raw_text=raw_text, filename=filename)
+    _merge_with_model_output(event=event, model_output=model_fields)
 
-    summary["event"] = dict(merged)
-    summary["provider"] = str(model_result.get("provider", summary["provider"]))
-    return summary
+    return {
+        "ok": True,
+        "provider": "gemini",
+        "text": str(text).strip() or event["summary"],
+        "rawText": raw_text or str(text).strip(),
+        "event": event,
+    }

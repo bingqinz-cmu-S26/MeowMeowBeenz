@@ -101,8 +101,8 @@ struct APIClient: Sendable {
 
     // MARK: Endpoints
 
-    func health() async throws -> Bool {
-        try await request("/api/health", as: HealthResponse.self).ok
+    func health() async throws -> HealthResponse {
+        try await request("/api/health", as: HealthResponse.self)
     }
 
     func login(username: String, password: String) async throws -> AuthResponse {

@@ -120,6 +120,7 @@ class ClipAnalysisResponse(BaseModel):
     ok: bool
     provider: str
     text: str
+    rawText: str | None = None
     file: ClipFileInfo
     event: TimelineEvent | None = None
     analysis: TimelineEvent | None = None

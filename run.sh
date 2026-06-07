@@ -11,17 +11,31 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-if [[ ! -d backend/.venv ]]; then
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "$PYTHON_BIN" ]]; then
+  PYTHON_BIN="$(command -v python3.12 || command -v python3)"
+fi
+
+if ! "$PYTHON_BIN" - <<'PY'
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 10) else 1)
+PY
+then
+  echo "Error: Python 3.10+ is required for the backend. Set PYTHON_BIN=/path/to/python3.12"
+  exit 1
+fi
+
+if [[ ! -d .venv-backend ]]; then
   echo "==> Creating Python virtualenv..."
-  python3 -m venv backend/.venv
+  "$PYTHON_BIN" -m venv .venv-backend
 fi
 
 echo "==> Installing backend dependencies..."
-backend/.venv/bin/pip install -q -r backend/requirements.txt
+.venv-backend/bin/pip install -q -r backend/requirements.txt
 
 if grep -qE '^LIVEKIT_URL=.+' .env && [[ "${START_VOICE_WORKER:-1}" != "0" ]]; then
   echo "==> Installing voice dependencies..."
-  backend/.venv/bin/pip install -q -r backend/requirements-voice.txt
+  .venv-backend/bin/pip install -q -r backend/requirements-voice.txt
 fi
 
 if lsof -ti :8000 >/dev/null 2>&1; then
@@ -42,4 +56,4 @@ fi
 
 echo "==> Starting backend (+ voice worker when LIVEKIT_* is set)..."
 cd backend
-exec .venv/bin/python run.py
+exec ../.venv-backend/bin/python run.py
