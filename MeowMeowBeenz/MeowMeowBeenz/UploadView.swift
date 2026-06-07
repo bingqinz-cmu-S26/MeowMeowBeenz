@@ -7,7 +7,6 @@ struct UploadView: View {
     @Environment(AppModel.self) private var app
 
     @State private var showCamera = false
-    @State private var showFileImporter = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var isAnalyzing = false
     @State private var statusMessage: String? = "Pick a video to analyze."
@@ -25,11 +24,9 @@ struct UploadView: View {
                     Button(action: captureWithCamera) {
                         Label("Take a video", systemImage: "video.badge.plus")
                     }
+                    .disabled(!CameraVideoPicker.canRecordVideo)
                     PhotosPicker(selection: $selectedPhotoItem, matching: .videos) {
                         Label("Pick from Photos", systemImage: "photo.on.rectangle")
-                    }
-                    Button(action: openFileImporter) {
-                        Label("Upload a video", systemImage: "video")
                     }
                 }
 
@@ -99,23 +96,6 @@ struct UploadView: View {
                     Task { await handlePickedVideo(result: result) }
                 }
             }
-            .fileImporter(
-                isPresented: $showFileImporter,
-                allowedContentTypes: [.movie, .video],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    guard let url = urls.first else {
-                        lastError = "No video was selected."
-                        statusMessage = "Please choose a video file first."
-                        return
-                    }
-                    Task { await analyzeVideo(at: url) }
-                case .failure(let error):
-                    lastError = "Could not select video: \(error.localizedDescription)"
-                }
-            }
             .onChange(of: selectedPhotoItem) { _, item in
                 Task { await analyzePhotoItem(item) }
             }
@@ -124,15 +104,10 @@ struct UploadView: View {
 
     private func captureWithCamera() {
         guard CameraVideoPicker.canRecordVideo else {
-            statusMessage = "Camera video is not available here. Use Upload a video instead."
-            showFileImporter = true
+            statusMessage = "Camera is not available here. Pick a video from Photos instead."
             return
         }
         showCamera = true
-    }
-
-    private func openFileImporter() {
-        showFileImporter = true
     }
 
     @MainActor
